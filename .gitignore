@@ -1,0 +1,13 @@
+# Zig build outputs
+.zig-cache/
+zig-out/
+
+# Love2D packages
+*.love
+
+# Windows and editor files
+*.user
+*.suo
+*.swp
+Thumbs.db
+.DS_Store
