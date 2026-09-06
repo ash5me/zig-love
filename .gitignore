@@ -1,6 +1,7 @@
 # Zig build outputs
 .zig-cache/
 zig-out/
+zig-pkg
 
 # Love2D packages
 *.love

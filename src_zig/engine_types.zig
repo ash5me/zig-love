@@ -1,5 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const ecs = @import("ecs");
 
 pub const INVALID_INDEX: u32 = std.math.maxInt(u32);
 pub const EVENT_QUEUE_CAPACITY: usize = 256;
@@ -72,7 +73,6 @@ pub const SnapshotHeader = extern struct {
     grid_height: u64,
     cell_size: f32,
     alive_count: u64,
-    free_head: u32,
     previous_buttons: u32,
     event_read: u64,
     event_write: u64,
@@ -87,6 +87,7 @@ pub const SnapshotHeader = extern struct {
 };
 
 pub const EngineContext = struct {
+    registry: ecs.Registry,
     capacity: usize,
     alive_count: usize,
     grid_width: usize,
@@ -98,9 +99,7 @@ pub const EngineContext = struct {
     velocities_x: []f32,
     velocities_y: []f32,
     sprite_ids: []u64,
-    alive: []bool,
-    next_free: []u32,
-    free_head: u32,
+    entities: []?ecs.Entity,
     grid_heads: []u32,
     next_in_cell: []u32,
     input: InputState,
@@ -150,6 +149,12 @@ pub const EngineContext = struct {
     gravity: f32,
     telemetry: Telemetry,
 };
+
+pub fn isAlive(context: *const EngineContext, index: usize) bool {
+    if (index >= context.capacity) return false;
+    const entity = context.entities[index] orelse return false;
+    return @constCast(&context.registry).valid(entity);
+}
 
 pub const WindowsTimer = if (builtin.os.tag == .windows) struct {
     pub extern "kernel32" fn QueryPerformanceCounter(counter: *i64) callconv(.winapi) i32;

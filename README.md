@@ -10,12 +10,27 @@ This project intentionally does not include ImGui or an editor overlay. The game
 - LÖVE 11.5 or compatible
 - A Windows/Linux/macOS build environment matching the target you want to compile for
 
+The engine uses [zig-ecs](https://github.com/prime31/zig-ecs), a Zig ECS library
+inspired by EnTT, for entity lifecycle and registry management.
+
 ## Build
 
 From the project root:
 
 ```powershell
 zig build
+```
+
+Dependencies are pinned in `build.zig.zon`. On a clean checkout, fetch them with:
+
+```powershell
+zig build --fetch
+```
+
+Run the native engine tests with:
+
+```powershell
+zig build test
 ```
 
 The native library is output to:
@@ -47,7 +62,7 @@ Sum from Zig: 42
 ## Current Features
 
 - Native engine context created in Zig and exposed to Lua through FFI
-- Entity pool with spawn, destroy, and reuse logic
+- ECS-managed entities with spawn, destroy, validity, and reuse logic
 - Position, velocity, render order, and sprite state management
 - Physics state: static, kinematic, and dynamic bodies
 - Dynamic-vs-dynamic collision response with impulses, restitution, and friction
@@ -65,6 +80,7 @@ Sum from Zig: 42
 
 ```text
 build.zig                Zig build configuration
+build.zig.zon            Pinned Zig package dependencies
 src_zig/
   engine_math.zig        Math helpers and utility routines
   engine_runtime.zig     Runtime simulation and update logic
@@ -81,6 +97,17 @@ tools/
   package.ps1            Package the game for distribution
 zig-out/bin/             Built native libraries and output artifacts
 ```
+
+## ECS Architecture
+
+Entity creation, validity, and destruction are owned by the pinned
+[`prime31/zig-ecs`](https://github.com/prime31/zig-ecs) registry. The existing
+SoA component arrays remain the native physics and LuaJIT FFI projection, so the
+public API does not need a second entity representation or a C++ bridge.
+
+The ECS registry owns entity handles and lifecycle state. Physics data such as
+positions, velocities, shapes, and collision state remains in native arrays for
+cache-friendly simulation and direct Lua access.
 
 ## Core Engine API
 

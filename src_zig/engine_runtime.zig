@@ -91,15 +91,15 @@ fn resolveStaticCollider(context: *EngineContext, index: usize, collider: usize)
 fn solveCollisions(context: *EngineContext) void {
     for (0..4) |_| {
         for (0..context.capacity) |index| {
-            if (!context.alive[index] or !context.collision_enabled[index] or context.body_type[index] != BODY_DYNAMIC) continue;
+            if (!types.isAlive(context, index) or !context.collision_enabled[index] or context.body_type[index] != BODY_DYNAMIC) continue;
             for (0..types.MAX_STATIC_COLLIDERS) |collider| {
                 if (context.static_collider_alive[collider]) resolveStaticCollider(context, index, collider);
             }
         }
         for (0..context.capacity) |first| {
-            if (!context.alive[first] or !context.collision_enabled[first]) continue;
+            if (!types.isAlive(context, first) or !context.collision_enabled[first]) continue;
             for (first + 1..context.capacity) |second| {
-                if (!context.alive[second] or !context.collision_enabled[second]) continue;
+                if (!types.isAlive(context, second) or !context.collision_enabled[second]) continue;
                 if (math.shapeContact(context, first, second)) |contact| resolveEntityContact(context, first, second, contact);
             }
         }
@@ -121,7 +121,7 @@ pub fn clearGrid(context: *EngineContext) void {
 pub fn rebuildSpatialGrid(context: *EngineContext) void {
     clearGrid(context);
     for (0..context.capacity) |index| {
-        if (!context.alive[index]) continue;
+        if (!types.isAlive(context, index)) continue;
         const cell = math.cellIndex(context, context.positions_x[index], context.positions_y[index]) orelse continue;
         context.next_in_cell[index] = context.grid_heads[cell];
         context.grid_heads[cell] = @intCast(index);
@@ -131,7 +131,7 @@ pub fn rebuildSpatialGrid(context: *EngineContext) void {
 pub fn sortRenderOrder(context: *EngineContext) void {
     var count: usize = 0;
     for (0..context.capacity) |index| {
-        if (!context.alive[index]) continue;
+        if (!types.isAlive(context, index)) continue;
         context.render_order[count] = @intCast(index);
         count += 1;
     }
@@ -148,7 +148,7 @@ pub fn sortRenderOrder(context: *EngineContext) void {
 
 pub fn updateAnimations(context: *EngineContext, dt: f32) void {
     for (0..context.capacity) |index| {
-        if (!context.alive[index] or context.animation_frame_count[index] == 0) continue;
+        if (!types.isAlive(context, index) or context.animation_frame_count[index] == 0) continue;
         context.animation_elapsed[index] += dt;
         while (context.animation_elapsed[index] >= context.animation_frame_duration[index]) {
             context.animation_elapsed[index] -= context.animation_frame_duration[index];
@@ -178,7 +178,7 @@ pub fn engineTick(context: *EngineContext, dt: f32) void {
     @memset(context.grounded, false);
     var substeps: usize = 1;
     for (0..context.capacity) |index| {
-        if (!context.alive[index] or !context.collision_enabled[index] or context.body_type[index] != types.BODY_DYNAMIC) continue;
+        if (!types.isAlive(context, index) or !context.collision_enabled[index] or context.body_type[index] != types.BODY_DYNAMIC) continue;
         const displacement = @sqrt(context.velocities_x[index] * context.velocities_x[index] + context.velocities_y[index] * context.velocities_y[index]) * dt;
         const extent = @max(@min(context.shape_half_width[index], context.shape_half_height[index]), 1);
         substeps = @max(substeps, @min(@as(usize, 32), @as(usize, @intFromFloat(@ceil(displacement / extent)))));
@@ -186,7 +186,7 @@ pub fn engineTick(context: *EngineContext, dt: f32) void {
     const step_dt = dt / @as(f32, @floatFromInt(substeps));
     for (0..substeps) |_| {
         for (0..context.capacity) |index| {
-            if (!context.alive[index] or context.body_type[index] == BODY_STATIC) continue;
+            if (!types.isAlive(context, index) or context.body_type[index] == BODY_STATIC) continue;
             if (context.body_type[index] == types.BODY_DYNAMIC) context.velocities_y[index] += context.gravity * step_dt;
             context.positions_x[index] += context.velocities_x[index] * step_dt;
             context.positions_y[index] += context.velocities_y[index] * step_dt;

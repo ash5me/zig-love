@@ -1,5 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const ecs = @import("ecs");
 const types = @import("engine_types.zig");
 const math = @import("engine_math.zig");
 const runtime = @import("engine_runtime.zig");
@@ -68,10 +69,8 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
     errdefer allocator.free(velocities_y);
     const sprite_ids = allocator.alloc(u64, capacity) catch return null;
     errdefer allocator.free(sprite_ids);
-    const alive = allocator.alloc(bool, capacity) catch return null;
-    errdefer allocator.free(alive);
-    const next_free = allocator.alloc(u32, capacity) catch return null;
-    errdefer allocator.free(next_free);
+    const entities = allocator.alloc(?ecs.Entity, capacity) catch return null;
+    errdefer allocator.free(entities);
     const grid_heads = allocator.alloc(u32, grid_width * grid_height) catch return null;
     errdefer allocator.free(grid_heads);
     const next_in_cell = allocator.alloc(u32, capacity) catch return null;
@@ -134,7 +133,7 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
     @memset(velocities_x, 0);
     @memset(velocities_y, 0);
     @memset(sprite_ids, 0);
-    @memset(alive, false);
+    @memset(entities, null);
     @memset(grid_heads, INVALID_INDEX);
     @memset(next_in_cell, INVALID_INDEX);
     @memset(path_visited, false);
@@ -162,11 +161,8 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
     @memset(polygon_vertices, 0);
     @memset(grounded, false);
     @memset(collision_enabled, false);
-    for (0..capacity) |index| {
-        next_free[index] = if (index + 1 < capacity) @intCast(index + 1) else INVALID_INDEX;
-    }
-
     context.* = .{
+        .registry = ecs.Registry.init(allocator),
         .capacity = capacity,
         .alive_count = 0,
         .grid_width = grid_width,
@@ -178,9 +174,7 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
         .velocities_x = velocities_x,
         .velocities_y = velocities_y,
         .sprite_ids = sprite_ids,
-        .alive = alive,
-        .next_free = next_free,
-        .free_head = 0,
+        .entities = entities,
         .grid_heads = grid_heads,
         .next_in_cell = next_in_cell,
         .input = .{ .buttons = 0, .mouse_x = 0, .mouse_y = 0 },
@@ -236,14 +230,14 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
 export fn engine_destroy(context: ?*EngineContext) void {
     const value = context orelse return;
     const allocator = std.heap.page_allocator;
+    value.registry.deinit();
     allocator.free(value.ids);
     allocator.free(value.positions_x);
     allocator.free(value.positions_y);
     allocator.free(value.velocities_x);
     allocator.free(value.velocities_y);
     allocator.free(value.sprite_ids);
-    allocator.free(value.alive);
-    allocator.free(value.next_free);
+    allocator.free(value.entities);
     allocator.free(value.grid_heads);
     allocator.free(value.next_in_cell);
     allocator.free(value.path_visited);
@@ -306,67 +300,72 @@ export fn engine_sprite_ids(context: *EngineContext) [*]u64 {
 }
 
 export fn engine_set_position(context: *EngineContext, index: u32, x: f32, y: f32) bool {
-    if (index >= context.capacity or !context.alive[index]) return false;
+    if (index >= context.capacity or !types.isAlive(context, index)) return false;
     context.positions_x[index] = x;
     context.positions_y[index] = y;
     return true;
 }
 
 export fn engine_set_velocity(context: *EngineContext, index: u32, x: f32, y: f32) bool {
-    if (index >= context.capacity or !context.alive[index]) return false;
+    if (index >= context.capacity or !types.isAlive(context, index)) return false;
     context.velocities_x[index] = x;
     context.velocities_y[index] = y;
     return true;
 }
 
 export fn engine_spawn(context: *EngineContext, id: u64, x: f32, y: f32, velocity_x: f32, velocity_y: f32, sprite_id: u64) u32 {
-    if (context.free_head == INVALID_INDEX) return INVALID_INDEX;
-    const index = context.free_head;
-    context.free_head = context.next_free[index];
-    context.next_free[index] = INVALID_INDEX;
-    context.ids[index] = id;
-    context.positions_x[index] = x;
-    context.positions_y[index] = y;
-    context.velocities_x[index] = velocity_x;
-    context.velocities_y[index] = velocity_y;
-    context.sprite_ids[index] = sprite_id;
-    context.animation_first_frame[index] = sprite_id;
-    context.animation_frame_ids[index] = sprite_id;
-    context.animation_frame[index] = 0;
-    context.animation_frame_count[index] = 0;
-    context.animation_elapsed[index] = 0;
-    context.animation_frame_duration[index] = 0;
-    context.animation_loop[index] = false;
-    context.render_z[index] = 0;
-    context.body_type[index] = BODY_DYNAMIC;
-    context.shape_type[index] = SHAPE_CIRCLE;
-    context.shape_radius[index] = 4;
-    context.capsule_half_length[index] = 0;
-    context.shape_half_width[index] = 4;
-    context.shape_half_height[index] = 4;
-    context.shape_rotation[index] = 0;
-    context.polygon_counts[index] = 0;
-    context.grounded[index] = false;
-    context.collision_enabled[index] = false;
-    context.alive[index] = true;
-    context.anchor_counts[index] = 0;
+    var index: ?usize = null;
+    for (context.entities, 0..) |entity, candidate| {
+        if (entity == null) {
+            index = candidate;
+            break;
+        }
+    }
+    const slot = index orelse return INVALID_INDEX;
+    const entity = context.registry.create();
+    context.entities[slot] = entity;
+    const index_u32: u32 = @intCast(slot);
+    context.ids[slot] = id;
+    context.positions_x[slot] = x;
+    context.positions_y[slot] = y;
+    context.velocities_x[slot] = velocity_x;
+    context.velocities_y[slot] = velocity_y;
+    context.sprite_ids[slot] = sprite_id;
+    context.animation_first_frame[slot] = sprite_id;
+    context.animation_frame_ids[slot] = sprite_id;
+    context.animation_frame[slot] = 0;
+    context.animation_frame_count[slot] = 0;
+    context.animation_elapsed[slot] = 0;
+    context.animation_frame_duration[slot] = 0;
+    context.animation_loop[slot] = false;
+    context.render_z[slot] = 0;
+    context.body_type[slot] = BODY_DYNAMIC;
+    context.shape_type[slot] = SHAPE_CIRCLE;
+    context.shape_radius[slot] = 4;
+    context.capsule_half_length[slot] = 0;
+    context.shape_half_width[slot] = 4;
+    context.shape_half_height[slot] = 4;
+    context.shape_rotation[slot] = 0;
+    context.polygon_counts[slot] = 0;
+    context.grounded[slot] = false;
+    context.collision_enabled[slot] = false;
+    context.anchor_counts[slot] = 0;
     context.alive_count += 1;
-    return index;
+    return index_u32;
 }
 
 export fn engine_destroy_entity(context: *EngineContext, index: u32) bool {
-    if (index >= context.capacity or !context.alive[index] or context.anchor_counts[index] != 0) return false;
-    context.alive[index] = false;
+    if (index >= context.capacity or !types.isAlive(context, index) or context.anchor_counts[index] != 0) return false;
+    context.registry.destroy(context.entities[index].?);
+    context.entities[index] = null;
     context.ids[index] = 0;
     context.anchor_counts[index] = 0;
-    context.next_free[index] = context.free_head;
-    context.free_head = index;
     context.alive_count -= 1;
     return true;
 }
 
 export fn engine_anchor_entity(context: *EngineContext, index: u32) bool {
-    if (index >= context.capacity or !context.alive[index]) return false;
+    if (index >= context.capacity or !types.isAlive(context, index)) return false;
     if (context.anchor_counts[index] == std.math.maxInt(u32)) return false;
     context.anchor_counts[index] += 1;
     return true;
@@ -394,7 +393,7 @@ export fn engine_camera_matrix(context: *const EngineContext) [*]const f32 {
 }
 
 export fn engine_set_render_z(context: *EngineContext, index: u32, z: i32) bool {
-    if (index >= context.capacity or !context.alive[index]) return false;
+    if (index >= context.capacity or !types.isAlive(context, index)) return false;
     context.render_z[index] = z;
     return true;
 }
@@ -409,14 +408,14 @@ export fn engine_render_order(context: *EngineContext) [*]const u32 {
 
 export fn engine_render_count(context: *const EngineContext) usize {
     var count: usize = 0;
-    for (context.alive) |is_alive| {
-        if (is_alive) count += 1;
+    for (0..context.capacity) |index| {
+        if (types.isAlive(context, index)) count += 1;
     }
     return count;
 }
 
 export fn engine_animation_set(context: *EngineContext, index: u32, first_frame_id: u64, frame_count: u32, frame_duration: f32, loop: bool) bool {
-    if (index >= context.capacity or !context.alive[index] or frame_count == 0 or frame_duration <= 0) return false;
+    if (index >= context.capacity or !types.isAlive(context, index) or frame_count == 0 or frame_duration <= 0) return false;
     context.animation_first_frame[index] = first_frame_id;
     context.animation_frame_ids[index] = first_frame_id;
     context.animation_frame[index] = 0;
@@ -429,12 +428,12 @@ export fn engine_animation_set(context: *EngineContext, index: u32, first_frame_
 }
 
 export fn engine_current_sprite_frame_id(context: *const EngineContext, index: u32) u64 {
-    if (index >= context.capacity or !context.alive[index]) return 0;
+    if (index >= context.capacity or !types.isAlive(context, index)) return 0;
     return context.animation_frame_ids[index];
 }
 
 export fn engine_set_body(context: *EngineContext, index: u32, body_type: u8, shape_type: u8, radius: f32, half_length: f32) bool {
-    if (index >= context.capacity or !context.alive[index] or body_type > BODY_DYNAMIC or (shape_type != SHAPE_CIRCLE and shape_type != SHAPE_CAPSULE) or radius <= 0 or half_length < 0) return false;
+    if (index >= context.capacity or !types.isAlive(context, index) or body_type > BODY_DYNAMIC or (shape_type != SHAPE_CIRCLE and shape_type != SHAPE_CAPSULE) or radius <= 0 or half_length < 0) return false;
     context.body_type[index] = body_type;
     context.shape_type[index] = shape_type;
     context.shape_radius[index] = radius;
@@ -448,7 +447,7 @@ export fn engine_set_body(context: *EngineContext, index: u32, body_type: u8, sh
 }
 
 export fn engine_set_aabb(context: *EngineContext, index: u32, body_type: u8, half_width: f32, half_height: f32) bool {
-    if (index >= context.capacity or !context.alive[index] or body_type > BODY_DYNAMIC or half_width <= 0 or half_height <= 0) return false;
+    if (index >= context.capacity or !types.isAlive(context, index) or body_type > BODY_DYNAMIC or half_width <= 0 or half_height <= 0) return false;
     context.body_type[index] = body_type;
     context.shape_type[index] = types.SHAPE_AABB;
     context.shape_half_width[index] = half_width;
@@ -462,7 +461,7 @@ export fn engine_set_aabb(context: *EngineContext, index: u32, body_type: u8, ha
 }
 
 export fn engine_set_obb(context: *EngineContext, index: u32, body_type: u8, half_width: f32, half_height: f32, rotation: f32) bool {
-    if (index >= context.capacity or !context.alive[index] or body_type > BODY_DYNAMIC or half_width <= 0 or half_height <= 0) return false;
+    if (index >= context.capacity or !types.isAlive(context, index) or body_type > BODY_DYNAMIC or half_width <= 0 or half_height <= 0) return false;
     context.body_type[index] = body_type;
     context.shape_type[index] = types.SHAPE_OBB;
     context.shape_half_width[index] = half_width;
@@ -475,7 +474,7 @@ export fn engine_set_obb(context: *EngineContext, index: u32, body_type: u8, hal
 }
 
 export fn engine_set_polygon(context: *EngineContext, index: u32, body_type: u8, vertices: [*]const f32, vertex_count: u8, rotation: f32) bool {
-    if (index >= context.capacity or !context.alive[index] or body_type > BODY_DYNAMIC or vertex_count < 3 or vertex_count > types.MAX_POLYGON_VERTICES) return false;
+    if (index >= context.capacity or !types.isAlive(context, index) or body_type > BODY_DYNAMIC or vertex_count < 3 or vertex_count > types.MAX_POLYGON_VERTICES) return false;
     context.body_type[index] = body_type;
     context.shape_type[index] = types.SHAPE_POLYGON;
     context.polygon_counts[index] = vertex_count;
@@ -514,12 +513,12 @@ export fn engine_clear_static_colliders(context: *EngineContext) void {
 }
 
 export fn engine_is_grounded(context: *const EngineContext, index: u32) bool {
-    if (index >= context.capacity or !context.alive[index]) return false;
+    if (index >= context.capacity or !types.isAlive(context, index)) return false;
     return context.grounded[index];
 }
 
 export fn engine_test_collision(context: *const EngineContext, first: u32, second: u32) bool {
-    if (first >= context.capacity or second >= context.capacity or !context.alive[first] or !context.alive[second] or first == second) return false;
+    if (first >= context.capacity or second >= context.capacity or !types.isAlive(context, first) or !types.isAlive(context, second) or first == second) return false;
     return math.shapeContact(context, first, second) != null;
 }
 
@@ -575,7 +574,7 @@ export fn engine_raycast(context: *const EngineContext, ax: f32, ay: f32, bx: f3
 
 export fn engine_find_entity(context: *const EngineContext, id: u64) u32 {
     for (0..context.capacity) |index| {
-        if (context.alive[index] and context.ids[index] == id) return @intCast(index);
+        if (types.isAlive(context, index) and context.ids[index] == id) return @intCast(index);
     }
     return INVALID_INDEX;
 }

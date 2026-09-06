@@ -7,8 +7,7 @@ pub fn snapshotPayloadSize(context: *const EngineContext) usize {
     return @sizeOf(SnapshotHeader) +
         @sizeOf(u64) * context.capacity * 2 +
         @sizeOf(f32) * context.capacity * 4 +
-        @sizeOf(bool) * context.capacity +
-        @sizeOf(u32) * context.capacity * 2 +
+        @sizeOf(u32) * context.capacity +
         @sizeOf(types.EngineEvent) * types.EVENT_QUEUE_CAPACITY +
         @sizeOf(bool) * context.grid_width * context.grid_height +
         @sizeOf(u32) * context.grid_width * context.grid_height * 2 +
@@ -49,7 +48,6 @@ pub fn snapshotWrite(context: *EngineContext, output: [*]u8, output_capacity: us
         .grid_height = context.grid_height,
         .cell_size = context.cell_size,
         .alive_count = context.alive_count,
-        .free_head = context.free_head,
         .previous_buttons = context.previous_buttons,
         .event_read = context.event_read,
         .event_write = context.event_write,
@@ -69,9 +67,7 @@ pub fn snapshotWrite(context: *EngineContext, output: [*]u8, output_capacity: us
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.positions_y))) return 0;
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.velocities_x))) return 0;
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.velocities_y))) return 0;
-    if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.alive))) return 0;
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.anchor_counts))) return 0;
-    if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.next_free))) return 0;
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.events[0..]))) return 0;
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.path_visited))) return 0;
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.path_parent))) return 0;
@@ -117,7 +113,6 @@ pub fn snapshotRead(context: *EngineContext, input: [*]const u8, input_size: usi
 
     context.alive_count = @intCast(header.alive_count);
     context.cell_size = header.cell_size;
-    context.free_head = header.free_head;
     context.previous_buttons = header.previous_buttons;
     context.event_read = @intCast(header.event_read);
     context.event_write = @intCast(header.event_write);
@@ -136,9 +131,7 @@ pub fn snapshotRead(context: *EngineContext, input: [*]const u8, input_size: usi
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.positions_y))) return false;
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.velocities_x))) return false;
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.velocities_y))) return false;
-    if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.alive))) return false;
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.anchor_counts))) return false;
-    if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.next_free))) return false;
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.events[0..]))) return false;
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.path_visited))) return false;
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.path_parent))) return false;

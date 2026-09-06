@@ -1,0 +1,23 @@
+.{
+    .name = .zig_love,
+    .version = "0.1.0",
+    .fingerprint = 0x9fe8b3fe7fdf7b10,
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{
+        .entt = .{
+            .url = "https://github.com/prime31/zig-ecs/archive/d3a429a157a0502ff4b3b2fa9389251bffca269e.tar.gz",
+            .hash = "entt-1.0.0-qJPtbEjuAgBGugkES3DQsThMbIilGXJhTqgcpp121VDK",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src_zig",
+        "ffi_bindings.lua",
+        "main.lua",
+        "game",
+        "modules",
+        "tools",
+        "README.md",
+    },
+}
