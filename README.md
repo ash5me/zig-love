@@ -74,6 +74,9 @@ Sum from Zig: 42
 - Snapshot serialization and restore support
 - Camera transform management
 - Animation state and frame selection in native code
+- Centralized asset manager with cached Lua, text, JSON, image, and sound loading
+- VFS-style normalized asset paths with modification-time cache invalidation
+- F5 hot reload support for gameplay and level data assets
 - Debug runtime panel in LÖVE for pause, gravity, spawn controls, and engine timing
 
 ## Project Layout
@@ -90,7 +93,11 @@ src_zig/
 main.lua                 LÖVE entry point and FFI bridge setup
 game_logic.lua           Reloadable gameplay logic
 modules/
+  assets.lua            Cached asset/VFS facade
+  json.lua              Dependency-free JSON decoder
   ui.lua                 Debug panel / runtime controls
+game/
+  levels.lua             Asset-backed platformer level data
 ffi_bindings.lua         LuaJIT FFI declarations
 tools/
   generate_bindings.ps1  Regenerate the FFI bindings
@@ -108,6 +115,21 @@ public API does not need a second entity representation or a C++ bridge.
 The ECS registry owns entity handles and lifecycle state. Physics data such as
 positions, velocities, shapes, and collision state remains in native arrays for
 cache-friendly simulation and direct Lua access.
+
+## Asset Pipeline
+
+`modules/assets.lua` is the single entry point for runtime assets. It normalizes
+paths and caches loaded values by asset type and path. It supports:
+
+- `load_lua(path)` for level and configuration data
+- `load_text(path)` and `load_json(path)` for data files
+- `load_image(path)` for textures
+- `load_sound(path, source_type)` for audio sources
+- `reload(path)`, `reload_all()`, and `clear()` for development and shutdown
+
+Platformer levels are loaded from `game/levels.lua` through this manager rather
+than being embedded in the gameplay module. Press `F5` to invalidate changed
+assets and reload gameplay and level data.
 
 ## Core Engine API
 

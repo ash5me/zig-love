@@ -1,46 +1,19 @@
 ---@diagnostic disable: undefined-global
 local platformer = {}
 
-local levels = {
-    {
-        name = "Greenway",
-        sky = { 0.10, 0.25, 0.34 },
-        start = { 48, 420 },
-        goal = { 860, 120 },
-        platforms = {
-            { 0, 470, 960, 50 }, { 120, 380, 150, 20 },
-            { 340, 310, 150, 20 }, { 570, 240, 150, 20 }, { 790, 170, 130, 20 },
-        },
-    },
-    {
-        name = "Copper Steps",
-        sky = { 0.30, 0.18, 0.12 },
-        start = { 42, 420 },
-        goal = { 870, 100 },
-        platforms = {
-            { 0, 470, 960, 50 }, { 90, 400, 120, 20 }, { 270, 330, 120, 20 },
-            { 450, 260, 120, 20 }, { 630, 190, 120, 20 }, { 810, 130, 110, 20 },
-        },
-    },
-    {
-        name = "Moonlit Ruins",
-        sky = { 0.08, 0.10, 0.24 },
-        start = { 42, 420 },
-        goal = { 870, 110 },
-        platforms = {
-            { 0, 470, 960, 50 }, { 70, 390, 110, 20 }, { 250, 440, 100, 20 },
-            { 390, 330, 110, 20 }, { 560, 400, 100, 20 }, { 700, 250, 110, 20 },
-            { 840, 160, 100, 20 },
-        },
-    },
-}
-
 local player = { index = 0, x = 0, y = 0, width = 24, height = 32, vx = 0, vy = 0, grounded = false }
 local jump_speed = -540
 local platform_entity_offset = 100 -- Entity ID offset reserved for static platform colliders in Zig
 
 local function level(state)
-    return levels[state.level_index]
+    return state.platformer_levels[state.level_index]
+end
+
+local function load_levels(state)
+    local loaded = state.assets:load_lua("game/levels.lua")
+    assert(type(loaded) == "table" and #loaded > 0, "game/levels.lua must return a non-empty level list")
+    state.platformer_levels = loaded
+    state.level_index = math.min(state.level_index or 1, #loaded)
 end
 
 local function reset(state)
@@ -70,6 +43,11 @@ local function reset(state)
 end
 
 function platformer.update(state, dt)
+    if not state.platformer_levels or state.assets_reload_requested then
+        load_levels(state)
+        state.assets_reload_requested = false
+        state.platformer_ready = false
+    end
     if not state.platformer_ready then
         state.level_index = 1
         state.platformer_ready = true
@@ -150,7 +128,7 @@ function platformer.update(state, dt)
     local goal = current.goal
     local bottom = player.y + player.height
     if player.x + player.width > goal[1] - 18 and player.x < goal[1] + 18 and player.y < goal[2] + 34 and bottom > goal[2] - 34 then
-        if state.level_index < #levels then
+        if state.level_index < #state.platformer_levels then
             state.level_index = state.level_index + 1
             reset(state)
             state.status_text = "Level " .. tostring(state.level_index) .. ": " .. level(state).name

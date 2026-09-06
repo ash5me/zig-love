@@ -22,6 +22,7 @@ local first_physics_index, static_position_x, physics_checked = INVALID_INDEX, 0
 local logic
 local runtime
 local debug_ui
+local assets
 local debug_ui_visible = false
 local debug_sequence = 1000000
 
@@ -116,9 +117,12 @@ function love.load()
     local nearby_count = zig.engine_query_cell(engine_context, 0, 0, query_results, ENTITY_CAPACITY)
     assert(nearby_count > 0, "Spatial grid query returned no entities")
     assert(zig.engine_pathfind_begin(engine_context, 0, 0, 20, 15), "Pathfinding request rejected")
+    local AssetManager = require("modules.assets")
+    assets = AssetManager.new()
     runtime = {
         context = engine_context,
         zig = zig,
+        assets = assets,
         event = event,
         positions_x = positions_x,
         positions_y = positions_y,
@@ -200,6 +204,8 @@ function love.draw()
 end
 
 local function reload_logic()
+    assets:reload_all()
+    runtime.assets_reload_requested = true
     local ok, candidate = pcall(dofile, "game_logic.lua")
     if not ok then
         print("Lua logic reload failed: " .. tostring(candidate))
@@ -247,5 +253,7 @@ function love.quit()
         event = nil
         runtime = nil
         logic = nil
+        if assets ~= nil then assets:clear() end
+        assets = nil
     end
 end
