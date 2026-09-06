@@ -2,27 +2,7 @@
 local ffi = require("ffi")
 local bit = require("bit")
 
-local imgui_root = "vendor/LuaJIT-ImGui/"
-package.path = imgui_root .. "lua/?.lua;" .. imgui_root .. "lua/?/init.lua;" .. package.path
-package.cpath = imgui_root .. "build-cimgui/?.dll;" .. package.cpath
-package.path = "modules/?.lua;editor/?.lua;game/?.lua;" .. package.path
-
-local imgui = require("imgui.love2d")
-local imgui_ready = false
-
-local function ensure_imgui_ready()
-    if imgui_ready then return end
-    imgui.love.Init({ use_imgui_docking = true, use_imgui_viewport = false })
-    imgui_ready = true
-end
-
-local function set_editor_active(active)
-    if active and editor ~= nil then
-        ensure_imgui_ready()
-        editor:init(imgui)
-    end
-    editor_active = active
-end
+package.path = "modules/?.lua;game/?.lua;" .. package.path
 
 ffi.cdef(dofile("ffi_bindings.lua"))
 
@@ -42,8 +22,6 @@ local first_physics_index, static_position_x, physics_checked = INVALID_INDEX, 0
 local logic
 local runtime
 local debug_ui
-local editor
-local editor_active = false
 local debug_ui_visible = false
 local debug_sequence = 1000000
 
@@ -170,7 +148,6 @@ function love.load()
     end
     logic = dofile("game_logic.lua")
     debug_ui = require("modules.ui")
-    editor = require("editor.imgui_editor")
 end
 
 function love.update(dt)
@@ -184,9 +161,7 @@ function love.update(dt)
     input_state.buttons = buttons
     input_state.mouse_x, input_state.mouse_y = love.mouse.getPosition()
     zig.engine_set_input(engine_context, input_state)
-    if editor_active then
-        editor:update(runtime, dt)
-    elseif debug_ui_visible then
+    if debug_ui_visible then
         debug_ui:update(runtime)
     end
     if not runtime.paused then
@@ -211,15 +186,7 @@ function love.draw()
         love.graphics.setColor(1, 1, 1, 1)
         love.graphics.print("Draw error: " .. tostring(err), 20, 20)
     end
-    if editor_active then
-        local editor_ok, editor_err = pcall(function()
-            if editor then editor:draw(runtime) end
-        end)
-        if not editor_ok then
-            love.graphics.setColor(1, 0.3, 0.3, 1)
-            love.graphics.print("Editor draw error: " .. tostring(editor_err), 20, 40)
-        end
-    elseif debug_ui_visible then
+    if debug_ui_visible then
         local ui_ok, ui_err = pcall(function()
             if debug_ui then debug_ui:draw(runtime) end
         end)
@@ -246,17 +213,11 @@ local function reload_logic()
 end
 
 function love.keypressed(key)
-    if key == "f1" or key == "`" then
-        set_editor_active(not editor_active)
-        return
-    end
     if key == "f2" then
         debug_ui_visible = not debug_ui_visible
         return
     end
-    if editor_active then
-        imgui.love.KeyPressed(key)
-    elseif debug_ui_visible and key == "f5" then
+    if debug_ui_visible and key == "f5" then
         reload_logic()
         debug_ui:keypressed(key)
     elseif debug_ui_visible then
@@ -265,31 +226,9 @@ function love.keypressed(key)
 end
 
 function love.textinput(text)
-    if editor_active then
-        imgui.love.TextInput(text)
-    elseif debug_ui_visible then
+    if debug_ui_visible then
         debug_ui:textinput(text)
     end
-end
-
-function love.keyreleased(key)
-    if editor_active then imgui.love.KeyReleased(key) end
-end
-
-function love.mousemoved(x, y, dx, dy, istouch)
-    if editor_active then imgui.love.MouseMoved(x, y) end
-end
-
-function love.mousepressed(x, y, button, istouch, presses)
-    if editor_active then imgui.love.MousePressed(button) end
-end
-
-function love.mousereleased(x, y, button, istouch, presses)
-    if editor_active then imgui.love.MouseReleased(button) end
-end
-
-function love.wheelmoved(x, y)
-    if editor_active then imgui.love.WheelMoved(x, y) end
 end
 
 function love.quit()
@@ -306,7 +245,5 @@ function love.quit()
         event = nil
         runtime = nil
         logic = nil
-        if editor ~= nil then editor:shutdown() end
-        editor = nil
     end
 end

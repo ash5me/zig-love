@@ -158,10 +158,9 @@ the nearest entity ID, entity index, impact coordinates, and distance through a
 
 ## Diagnostics and Cross-Compilation
 
-The in-game debug panel reports native physics, spatial-sort, FFI serialization,
-and Lua draw times in microseconds. It also provides a pause toggle, a gravity
-slider, a numeric spawn-count field, and a spawn button. Native timings use
-Windows QueryPerformanceCounter on the production Windows target.
+The optional in-game debug panel reports native physics, spatial-sort, FFI
+serialization, and Lua draw times in microseconds. Native timings use Windows
+QueryPerformanceCounter on the production Windows target.
 
 Cross-target ABI checks compile the shared library without requiring the host OS
 to match the target:
