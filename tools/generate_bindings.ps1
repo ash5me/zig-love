@@ -8,6 +8,7 @@ $zig = Get-Content -Raw $Source
 $typeMap = @{
     "u32" = "uint32_t"
     "u64" = "uint64_t"
+    "u8" = "uint8_t"
     "i32" = "int32_t"
     "usize" = "size_t"
     "f32" = "float"
@@ -17,7 +18,9 @@ $typeMap = @{
 
 function Convert-Type([string]$type) {
     $type = $type.Trim()
+    if ($type.StartsWith("?[*]")) { return (Convert-Type $type.Substring(4)) + "*" }
     if ($type.StartsWith("[*]")) { return (Convert-Type $type.Substring(3)) + "*" }
+    if ($type.StartsWith("const ")) { return "const " + (Convert-Type $type.Substring(6)) }
     if ($type.StartsWith("?*")) { return (Convert-Type $type.Substring(2)) + "*" }
     if ($type.StartsWith("*const ")) { return "const " + (Convert-Type $type.Substring(7)) + "*" }
     if ($type.StartsWith("*")) { return (Convert-Type $type.Substring(1)) + "*" }
@@ -40,7 +43,7 @@ foreach ($match in $structMatches) {
 }
 $lines.Add("")
 
-$functionMatches = [regex]::Matches($zig, 'export fn (\w+)\((?<args>[^)]*)\)\s*(?<return>[?*\[\]\w]+)', [System.Text.RegularExpressions.RegexOptions]::Singleline)
+$functionMatches = [regex]::Matches($zig, 'export fn (\w+)\((?<args>[^)]*)\)\s*(?<return>[?*\[\]\w ]+)\s*\{', [System.Text.RegularExpressions.RegexOptions]::Singleline)
 foreach ($match in $functionMatches) {
     $args = [System.Collections.Generic.List[string]]::new()
     foreach ($arg in $match.Groups["args"].Value.Split(',')) {

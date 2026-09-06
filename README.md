@@ -86,6 +86,49 @@ The reusable grid also backs a breadth-first pathfinder. `engine_pathfind_begin`
 starts a request and `engine_pathfind_step` processes only the requested node
 budget per frame, preventing a large search from blocking the render loop.
 
+## Advanced Memory Systems
+
+`engine_snapshot_size`, `engine_snapshot_write`, and `engine_snapshot_read`
+serialize and restore the pool arrays, lifecycle free-list, anchors, input,
+events, and pathfinding state. Snapshots include a magic number, version, and
+layout dimensions so incompatible buffers are rejected before mutation.
+
+Lua-held entity references use `engine_anchor_entity` and
+`engine_release_entity`. An anchored live slot cannot be destroyed or returned
+to the free-list until every matching release has occurred.
+
+`engine_frame_alloc` provides short-lived byte storage from a fixed native arena.
+`engine_frame_begin` resets it, and `engine_update` calls that reset
+automatically at the start of every frame. Exhaustion returns a null pointer;
+there is no fallback allocation during gameplay.
+
+## Gameplay and Rendering Pipeline
+
+`CameraState` is maintained in Zig with position, scale, rotation, viewport, and
+parallax values. `engine_camera_matrix` exposes the calculated 3x3 transform;
+the Lua renderer embeds it into LÖVE's transform before drawing.
+
+Render layers use a separate `render_z` array and `render_order` index buffer.
+`engine_sort_render_order` and the frame update sort indices by Z without moving
+the position, velocity, or sprite SoA arrays.
+
+Animation state is also native. `engine_animation_set` configures the first frame,
+frame count, duration, and loop mode; `engine_update` advances it and
+`engine_current_sprite_frame_id` returns the active frame ID for Lua-side asset
+selection.
+
+## Physics and Geometry
+
+Entities can be configured as `BODY_STATIC`, `BODY_KINEMATIC`, or
+`BODY_DYNAMIC`. Static bodies do not move, kinematic bodies follow their velocity
+without gravity, and dynamic bodies receive gravity and velocity integration.
+`engine_set_body` also selects circle or vertical capsule narrow-phase geometry.
+
+`engine_test_collision` performs circle/capsule distance tests. `engine_raycast`
+walks the spatial grid along a segment and tests the candidate shapes, returning
+the nearest entity ID, entity index, impact coordinates, and distance through a
+`RaycastHit` result.
+
 ## Exported Functions
 
 - `add_numbers(a, b)` returns the sum of two integers.
@@ -98,7 +141,39 @@ budget per frame, preventing a large search from blocking the render loop.
 - `engine_next_event(context, output)` drains one queued gameplay event.
 - `engine_pathfind_begin(context, start_x, start_y, goal_x, goal_y)` starts a search.
 - `engine_pathfind_step(context, node_budget)` advances the search incrementally.
+- `engine_snapshot_write(context, buffer, capacity)` serializes engine state.
+- `engine_snapshot_read(context, buffer, size)` validates and restores a snapshot.
+- `engine_anchor_entity(context, index)` protects a Lua-held entity slot.
+- `engine_release_entity(context, index)` releases one Lua anchor.
+- `engine_frame_alloc(context, size)` allocates temporary frame memory.
+- `engine_camera_set(context, camera)` updates the world-to-screen camera.
+- `engine_camera_matrix(context)` returns the calculated transform matrix.
+- `engine_sort_render_order(context)` sorts the render index buffer by Z.
+- `engine_animation_set(context, index, first_frame, count, duration, loop)` configures an animation.
+- `engine_current_sprite_frame_id(context, index)` reads the native animation frame.
+- `engine_set_body(context, index, body_type, shape_type, radius, half_length)` configures physics behavior.
+- `engine_test_collision(context, first, second)` performs circle/capsule collision testing.
+- `engine_raycast(context, ax, ay, bx, by, output)` performs a grid-accelerated LOS query.
 - `engine_update(context, dt)` updates active entities and rebuilds the grid.
+
+## Diagnostics and Cross-Compilation
+
+The in-game debug panel reports native physics, spatial-sort, FFI serialization,
+and Lua draw times in microseconds. It also provides a pause toggle, a gravity
+slider, a numeric spawn-count field, and a spawn button. Native timings use
+Windows QueryPerformanceCounter on the production Windows target.
+
+Cross-target ABI checks compile the shared library without requiring the host OS
+to match the target:
+
+```powershell
+zig build cross-windows
+zig build cross-linux
+zig build cross-macos
+```
+
+Use `-Dcross-release=false` for faster debug-oriented cross checks. The normal
+`zig build -Dproduction=true` path still produces the host platform artifact.
 
 ## Phase 5 Shipping
 
