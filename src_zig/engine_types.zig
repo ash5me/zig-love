@@ -1,0 +1,147 @@
+const std = @import("std");
+const builtin = @import("builtin");
+
+pub const INVALID_INDEX: u32 = std.math.maxInt(u32);
+pub const EVENT_QUEUE_CAPACITY: usize = 256;
+pub const FRAME_ARENA_CAPACITY: usize = 64 * 1024;
+pub const SNAPSHOT_MAGIC: u32 = 0x5A47454E;
+pub const SNAPSHOT_VERSION: u32 = 1;
+
+pub const InputState = extern struct {
+    buttons: u32,
+    mouse_x: f32,
+    mouse_y: f32,
+};
+
+pub const EngineEvent = extern struct {
+    id: u32,
+    value: u32,
+};
+
+pub const Telemetry = extern struct {
+    physics_us: u64,
+    spatial_sort_us: u64,
+    ffi_serialization_us: u64,
+    frame_us: u64,
+};
+
+pub const RaycastHit = extern struct {
+    entity_index: u32,
+    entity_id: u64,
+    x: f32,
+    y: f32,
+    distance: f32,
+};
+
+pub const BODY_STATIC: u8 = 0;
+pub const BODY_KINEMATIC: u8 = 1;
+pub const BODY_DYNAMIC: u8 = 2;
+pub const SHAPE_CIRCLE: u8 = 1;
+pub const SHAPE_CAPSULE: u8 = 2;
+
+pub const EVENT_PLAY_SOUND: u32 = 1;
+pub const EVENT_PLAYER_DIED: u32 = 2;
+pub const EVENT_PATH_READY: u32 = 3;
+
+pub const PATH_IDLE: u32 = 0;
+pub const PATH_WORKING: u32 = 1;
+pub const PATH_FOUND: u32 = 2;
+pub const PATH_FAILED: u32 = 3;
+
+pub const CameraState = extern struct {
+    x: f32,
+    y: f32,
+    scale: f32,
+    rotation: f32,
+    parallax_x: f32,
+    parallax_y: f32,
+    viewport_width: f32,
+    viewport_height: f32,
+};
+
+pub const SnapshotHeader = extern struct {
+    magic: u32,
+    version: u32,
+    capacity: u64,
+    grid_width: u64,
+    grid_height: u64,
+    cell_size: f32,
+    alive_count: u64,
+    free_head: u32,
+    previous_buttons: u32,
+    event_read: u64,
+    event_write: u64,
+    event_count: u64,
+    path_start: u32,
+    path_goal: u32,
+    path_queue_head: u64,
+    path_queue_tail: u64,
+    path_state: u32,
+    input: InputState,
+    gravity: f32,
+};
+
+pub const EngineContext = struct {
+    capacity: usize,
+    alive_count: usize,
+    grid_width: usize,
+    grid_height: usize,
+    cell_size: f32,
+    ids: []u64,
+    positions_x: []f32,
+    positions_y: []f32,
+    velocities_x: []f32,
+    velocities_y: []f32,
+    sprite_ids: []u64,
+    alive: []bool,
+    next_free: []u32,
+    free_head: u32,
+    grid_heads: []u32,
+    next_in_cell: []u32,
+    input: InputState,
+    previous_buttons: u32,
+    events: [EVENT_QUEUE_CAPACITY]EngineEvent,
+    event_read: usize,
+    event_write: usize,
+    event_count: usize,
+    path_visited: []bool,
+    path_parent: []u32,
+    path_queue: []u32,
+    path_start: u32,
+    path_goal: u32,
+    path_queue_head: usize,
+    path_queue_tail: usize,
+    path_state: u32,
+    anchor_counts: []u32,
+    frame_arena: []u8,
+    frame_arena_offset: usize,
+    camera: CameraState,
+    camera_matrix: [9]f32,
+    render_order: []u32,
+    render_z: []i32,
+    animation_first_frame: []u64,
+    animation_frame_ids: []u64,
+    animation_frame: []u32,
+    animation_frame_count: []u32,
+    animation_elapsed: []f32,
+    animation_frame_duration: []f32,
+    animation_loop: []bool,
+    body_type: []u8,
+    shape_type: []u8,
+    shape_radius: []f32,
+    capsule_half_length: []f32,
+    gravity: f32,
+    telemetry: Telemetry,
+};
+
+pub const WindowsTimer = if (builtin.os.tag == .windows) struct {
+    pub extern "kernel32" fn QueryPerformanceCounter(counter: *i64) callconv(.winapi) i32;
+    pub extern "kernel32" fn QueryPerformanceFrequency(frequency: *i64) callconv(.winapi) i32;
+} else struct {};
+
+pub const PosixTimer = if (builtin.os.tag == .linux or builtin.os.tag == .macos) struct {
+    pub const Timespec = extern struct { sec: i64, nsec: i64 };
+    pub extern "c" fn clock_gettime(clock_id: i32, time: *Timespec) callconv(.c) i32;
+} else struct {};
+
+pub var timer_frequency: u64 = 0;

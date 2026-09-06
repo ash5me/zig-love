@@ -5,7 +5,24 @@ local bit = require("bit")
 local imgui_root = "vendor/LuaJIT-ImGui/"
 package.path = imgui_root .. "lua/?.lua;" .. imgui_root .. "lua/?/init.lua;" .. package.path
 package.cpath = imgui_root .. "build-cimgui/?.dll;" .. package.cpath
+package.path = "modules/?.lua;editor/?.lua;game/?.lua;" .. package.path
+
 local imgui = require("imgui.love2d")
+local imgui_ready = false
+
+local function ensure_imgui_ready()
+    if imgui_ready then return end
+    imgui.love.Init({ use_imgui_docking = true, use_imgui_viewport = false })
+    imgui_ready = true
+end
+
+local function set_editor_active(active)
+    if active and editor ~= nil then
+        ensure_imgui_ready()
+        editor:init(imgui)
+    end
+    editor_active = active
+end
 
 ffi.cdef(dofile("ffi_bindings.lua"))
 
@@ -27,6 +44,7 @@ local runtime
 local debug_ui
 local editor
 local editor_active = false
+local debug_ui_visible = false
 local debug_sequence = 1000000
 
 local FNV_OFFSET = 2166136261
@@ -43,6 +61,14 @@ local function fnv1a32(value)
 end
 
 function love.load()
+    love.window.setMode(960, 600, {
+        fullscreen = false,
+        resizable = true,
+        borderless = false,
+        centered = true,
+        minwidth = 720,
+        minheight = 500,
+    })
     print("Sum from Zig:", zig.add_numbers(15, 27))
     engine_context = zig.engine_create(ENTITY_CAPACITY, GRID_WIDTH, GRID_HEIGHT, CELL_SIZE)
     assert(engine_context ~= nil, "Zig could not allocate EngineContext")
@@ -143,9 +169,8 @@ function love.load()
         end
     end
     logic = dofile("game_logic.lua")
-    debug_ui = dofile("debug_ui.lua")
-    editor = dofile("editor_imgui.lua")
-    editor:init(imgui)
+    debug_ui = require("modules.ui")
+    editor = require("editor.imgui_editor")
 end
 
 function love.update(dt)
@@ -161,7 +186,7 @@ function love.update(dt)
     zig.engine_set_input(engine_context, input_state)
     if editor_active then
         editor:update(runtime, dt)
-    else
+    elseif debug_ui_visible then
         debug_ui:update(runtime)
     end
     if not runtime.paused then
@@ -176,11 +201,32 @@ function love.update(dt)
 end
 
 function love.draw()
-    logic.draw(runtime)
+    love.graphics.clear(0.08, 0.12, 0.20, 1)
+    local ok, err = pcall(function()
+        if logic and runtime then
+            logic.draw(runtime)
+        end
+    end)
+    if not ok then
+        love.graphics.setColor(1, 1, 1, 1)
+        love.graphics.print("Draw error: " .. tostring(err), 20, 20)
+    end
     if editor_active then
-        editor:draw(runtime)
-    else
-        debug_ui:draw(runtime)
+        local editor_ok, editor_err = pcall(function()
+            if editor then editor:draw(runtime) end
+        end)
+        if not editor_ok then
+            love.graphics.setColor(1, 0.3, 0.3, 1)
+            love.graphics.print("Editor draw error: " .. tostring(editor_err), 20, 40)
+        end
+    elseif debug_ui_visible then
+        local ui_ok, ui_err = pcall(function()
+            if debug_ui then debug_ui:draw(runtime) end
+        end)
+        if not ui_ok then
+            love.graphics.setColor(1, 0.3, 0.3, 1)
+            love.graphics.print("UI draw error: " .. tostring(ui_err), 20, 40)
+        end
     end
 end
 
@@ -201,15 +247,19 @@ end
 
 function love.keypressed(key)
     if key == "f1" or key == "`" then
-        editor_active = not editor_active
+        set_editor_active(not editor_active)
+        return
+    end
+    if key == "f2" then
+        debug_ui_visible = not debug_ui_visible
         return
     end
     if editor_active then
         imgui.love.KeyPressed(key)
-    elseif key == "f5" then
+    elseif debug_ui_visible and key == "f5" then
         reload_logic()
         debug_ui:keypressed(key)
-    else
+    elseif debug_ui_visible then
         debug_ui:keypressed(key)
     end
 end
@@ -217,7 +267,7 @@ end
 function love.textinput(text)
     if editor_active then
         imgui.love.TextInput(text)
-    else
+    elseif debug_ui_visible then
         debug_ui:textinput(text)
     end
 end
