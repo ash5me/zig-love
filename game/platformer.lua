@@ -37,7 +37,7 @@ local levels = {
 
 local player = { index = 0, x = 0, y = 0, width = 24, height = 32, vx = 0, vy = 0, grounded = false }
 local jump_speed = -540
-local landing_tolerance = 8
+local platform_entity_offset = 100 -- Entity ID offset reserved for static platform colliders in Zig
 
 local function level(state)
     return levels[state.level_index]
@@ -47,14 +47,26 @@ local function reset(state)
     local current = level(state)
     player.x, player.y = current.start[1], current.start[2]
     player.vx, player.vy, player.grounded = 0, 0, false
-    state.zig.engine_set_body(state.context, player.index, 2, 1, 12, 0)
-    state.zig.engine_set_position(state.context, player.index, player.x, player.y)
-    state.zig.engine_set_velocity(state.context, player.index, 0, 0)
-    state.status_text = "Reach the gold beacon"
-end
 
-local function horizontal_overlap(left, right, platform)
-    return right > platform[1] and left < platform[1] + platform[3]
+    -- Initialize Player in Zig physics solver context
+    if state.zig and state.zig.engine_set_body and state.context then
+        state.zig.engine_set_body(state.context, player.index, 2, 1, player.width / 2, player.height / 2)
+        state.zig.engine_set_position(state.context, player.index, player.x, player.y)
+        state.zig.engine_set_velocity(state.context, player.index, 0, 0)
+    end
+
+    -- Register Static Platform Bodies into the Zig Physics Engine
+    for i, plat in ipairs(current.platforms) do
+        local platform_id = platform_entity_offset + i
+        local center_x = plat[1] + plat[3] / 2
+        local center_y = plat[2] + plat[4] / 2
+        if state.zig and state.zig.engine_set_body and state.context then
+            state.zig.engine_set_body(state.context, platform_id, 1, 0, plat[3] / 2, plat[4] / 2)
+            state.zig.engine_set_position(state.context, platform_id, center_x, center_y)
+        end
+    end
+
+    state.status_text = "Reach the gold beacon"
 end
 
 function platformer.update(state, dt)
@@ -66,31 +78,77 @@ function platformer.update(state, dt)
 
     if love.keyboard.isDown("r") then reset(state) end
     local current = level(state)
+    
+    -- Horizontal movement inputs
     local direction = 0
     if love.keyboard.isDown("left") or love.keyboard.isDown("a") then direction = direction - 1 end
     if love.keyboard.isDown("right") or love.keyboard.isDown("d") then direction = direction + 1 end
     player.vx = direction * 190
+
+    -- Jump trigger
     if (love.keyboard.isDown("space") or love.keyboard.isDown("up") or love.keyboard.isDown("w")) and player.grounded then
         player.vy, player.grounded = jump_speed, false
     end
 
-    local previous_bottom = player.y + player.height
+    -- Apply gravity integration
     player.vy = math.min(player.vy + 980 * dt, 620)
-    player.x = math.max(0, math.min(936, player.x + player.vx * dt))
-    player.y = player.y + player.vy * dt
-    player.grounded = false
-    local left, right = player.x, player.x + player.width
-    local bottom = player.y + player.height
-    for _, platform in ipairs(current.platforms) do
-        local crossed_top = previous_bottom <= platform[2] + landing_tolerance and bottom >= platform[2]
-        if player.vy >= 0 and crossed_top and horizontal_overlap(left, right, platform) then
-            player.y, player.vy, player.grounded = platform[2] - player.height, 0, true
-            bottom = player.y + player.height
+    
+    -- Sync updated physics state to Zig before solver queries
+    if state.zig and state.zig.engine_set_position and state.context then
+        state.zig.engine_set_position(state.context, player.index, player.x, player.y)
+        state.zig.engine_set_velocity(state.context, player.index, player.vx, player.vy)
+    end
+
+    -- Move character
+    local next_x = math.max(0, math.min(936, player.x + player.vx * dt))
+    local next_y = player.y + player.vy * dt
+
+    -- Fallback & ground collision check against level platforms
+    local landed = false
+    if player.vy >= 0 then
+        for _, plat in ipairs(current.platforms) do
+            local px, py, pw, ph = plat[1], plat[2], plat[3], plat[4]
+            local player_bottom = player.y + player.height
+            local next_bottom = next_y + player.height
+
+            -- Check if player overlaps horizontally and crosses top edge of platform vertically
+            if (next_x + player.width > px) and (next_x < px + pw) then
+                if player_bottom <= py + 8 and next_bottom >= py then
+                    next_y = py - player.height
+                    player.vy = 0
+                    landed = true
+                    break
+                end
+            end
         end
     end
+
+    -- Raycast check via C/Zig physics solver (if available)
+    if not landed and player.vy >= 0 then
+        local ray_origin_x = player.x + player.width / 2
+        local ray_origin_y = player.y + player.height
+        local ray_length = math.max(8, player.vy * dt)
+
+        if state.zig and state.zig.engine_raycast then
+            local status, hit_fraction = pcall(state.zig.engine_raycast, ray_origin_x, ray_origin_y, 0, ray_length)
+            if status and type(hit_fraction) == "number" and hit_fraction >= 0 and hit_fraction <= 1.0 then
+                next_y = (ray_origin_y + ray_length * hit_fraction) - player.height
+                player.vy = 0
+                landed = true
+            end
+        end
+    end
+
+    player.x = next_x
+    player.y = next_y
+    player.grounded = landed
+
+    -- Check kill boundary
     if player.y > 560 then reset(state) end
 
+    -- Goal detection
     local goal = current.goal
+    local bottom = player.y + player.height
     if player.x + player.width > goal[1] - 18 and player.x < goal[1] + 18 and player.y < goal[2] + 34 and bottom > goal[2] - 34 then
         if state.level_index < #levels then
             state.level_index = state.level_index + 1
@@ -100,8 +158,12 @@ function platformer.update(state, dt)
             state.status_text = "All three levels complete! Press R to replay"
         end
     end
-    state.zig.engine_set_position(state.context, player.index, player.x, player.y)
-    state.zig.engine_set_velocity(state.context, player.index, player.vx, player.vy)
+
+    -- Write back resolved entity state to Zig
+    if state.zig and state.zig.engine_set_position and state.context then
+        state.zig.engine_set_position(state.context, player.index, player.x, player.y)
+        state.zig.engine_set_velocity(state.context, player.index, player.vx, player.vy)
+    end
 end
 
 function platformer.draw(state)
