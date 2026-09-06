@@ -16,7 +16,10 @@ pub fn snapshotPayloadSize(context: *const EngineContext) usize {
         @sizeOf(i32) * context.capacity + @sizeOf(u64) * context.capacity * 2 +
         @sizeOf(u32) * context.capacity * 2 + @sizeOf(f32) * context.capacity * 2 +
         @sizeOf(bool) * context.capacity + @sizeOf(u8) * context.capacity * 2 +
-        @sizeOf(f32) * context.capacity * 2;
+        @sizeOf(f32) * context.capacity * 5 + @sizeOf(u8) * context.capacity +
+        @sizeOf(f32) * context.capacity * types.MAX_POLYGON_VERTICES * 2 +
+        @sizeOf(bool) * context.capacity * 2 + @sizeOf(bool) * types.MAX_STATIC_COLLIDERS +
+        @sizeOf(f32) * types.MAX_STATIC_COLLIDERS * 4;
 }
 
 fn writeBytes(output: []u8, offset: *usize, source: []const u8) bool {
@@ -87,6 +90,18 @@ pub fn snapshotWrite(context: *EngineContext, output: [*]u8, output_capacity: us
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.shape_type))) return 0;
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.shape_radius))) return 0;
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.capsule_half_length))) return 0;
+    if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.shape_half_width))) return 0;
+    if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.shape_half_height))) return 0;
+    if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.shape_rotation))) return 0;
+    if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.polygon_counts))) return 0;
+    if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.polygon_vertices))) return 0;
+    if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.grounded))) return 0;
+    if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.collision_enabled))) return 0;
+    if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.static_collider_alive[0..]))) return 0;
+    if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.static_collider_x[0..]))) return 0;
+    if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.static_collider_y[0..]))) return 0;
+    if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.static_collider_half_width[0..]))) return 0;
+    if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.static_collider_half_height[0..]))) return 0;
     return offset;
 }
 
@@ -142,5 +157,17 @@ pub fn snapshotRead(context: *EngineContext, input: [*]const u8, input_size: usi
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.shape_type))) return false;
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.shape_radius))) return false;
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.capsule_half_length))) return false;
+    if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.shape_half_width))) return false;
+    if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.shape_half_height))) return false;
+    if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.shape_rotation))) return false;
+    if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.polygon_counts))) return false;
+    if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.polygon_vertices))) return false;
+    if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.grounded))) return false;
+    if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.collision_enabled))) return false;
+    if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.static_collider_alive[0..]))) return false;
+    if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.static_collider_x[0..]))) return false;
+    if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.static_collider_y[0..]))) return false;
+    if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.static_collider_half_width[0..]))) return false;
+    if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.static_collider_half_height[0..]))) return false;
     return true;
 }

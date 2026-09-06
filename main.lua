@@ -122,6 +122,8 @@ function love.load()
         event = event,
         positions_x = positions_x,
         positions_y = positions_y,
+        velocities_x = velocities_x,
+        velocities_y = velocities_y,
         render_order = render_order,
         camera_matrix = camera_matrix,
         camera_transform = camera_transform,

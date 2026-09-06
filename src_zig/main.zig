@@ -112,6 +112,20 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
     errdefer allocator.free(shape_radius);
     const capsule_half_length = allocator.alloc(f32, capacity) catch return null;
     errdefer allocator.free(capsule_half_length);
+    const shape_half_width = allocator.alloc(f32, capacity) catch return null;
+    errdefer allocator.free(shape_half_width);
+    const shape_half_height = allocator.alloc(f32, capacity) catch return null;
+    errdefer allocator.free(shape_half_height);
+    const shape_rotation = allocator.alloc(f32, capacity) catch return null;
+    errdefer allocator.free(shape_rotation);
+    const polygon_counts = allocator.alloc(u8, capacity) catch return null;
+    errdefer allocator.free(polygon_counts);
+    const polygon_vertices = allocator.alloc(f32, capacity * types.MAX_POLYGON_VERTICES * 2) catch return null;
+    errdefer allocator.free(polygon_vertices);
+    const grounded = allocator.alloc(bool, capacity) catch return null;
+    errdefer allocator.free(grounded);
+    const collision_enabled = allocator.alloc(bool, capacity) catch return null;
+    errdefer allocator.free(collision_enabled);
     const context = allocator.create(EngineContext) catch return null;
 
     @memset(ids, 0);
@@ -141,6 +155,13 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
     @memset(shape_type, SHAPE_CIRCLE);
     @memset(shape_radius, 4);
     @memset(capsule_half_length, 0);
+    @memset(shape_half_width, 4);
+    @memset(shape_half_height, 4);
+    @memset(shape_rotation, 0);
+    @memset(polygon_counts, 0);
+    @memset(polygon_vertices, 0);
+    @memset(grounded, false);
+    @memset(collision_enabled, false);
     for (0..capacity) |index| {
         next_free[index] = if (index + 1 < capacity) @intCast(index + 1) else INVALID_INDEX;
     }
@@ -194,6 +215,18 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
         .shape_type = shape_type,
         .shape_radius = shape_radius,
         .capsule_half_length = capsule_half_length,
+        .shape_half_width = shape_half_width,
+        .shape_half_height = shape_half_height,
+        .shape_rotation = shape_rotation,
+        .polygon_counts = polygon_counts,
+        .polygon_vertices = polygon_vertices,
+        .grounded = grounded,
+        .collision_enabled = collision_enabled,
+        .static_collider_alive = [_]bool{false} ** types.MAX_STATIC_COLLIDERS,
+        .static_collider_x = [_]f32{0} ** types.MAX_STATIC_COLLIDERS,
+        .static_collider_y = [_]f32{0} ** types.MAX_STATIC_COLLIDERS,
+        .static_collider_half_width = [_]f32{0} ** types.MAX_STATIC_COLLIDERS,
+        .static_collider_half_height = [_]f32{0} ** types.MAX_STATIC_COLLIDERS,
         .gravity = 98.0,
         .telemetry = .{ .physics_us = 0, .spatial_sort_us = 0, .ffi_serialization_us = 0, .frame_us = 0 },
     };
@@ -231,6 +264,13 @@ export fn engine_destroy(context: ?*EngineContext) void {
     allocator.free(value.shape_type);
     allocator.free(value.shape_radius);
     allocator.free(value.capsule_half_length);
+    allocator.free(value.shape_half_width);
+    allocator.free(value.shape_half_height);
+    allocator.free(value.shape_rotation);
+    allocator.free(value.polygon_counts);
+    allocator.free(value.polygon_vertices);
+    allocator.free(value.grounded);
+    allocator.free(value.collision_enabled);
     allocator.destroy(value);
 }
 
@@ -302,6 +342,12 @@ export fn engine_spawn(context: *EngineContext, id: u64, x: f32, y: f32, velocit
     context.shape_type[index] = SHAPE_CIRCLE;
     context.shape_radius[index] = 4;
     context.capsule_half_length[index] = 0;
+    context.shape_half_width[index] = 4;
+    context.shape_half_height[index] = 4;
+    context.shape_rotation[index] = 0;
+    context.polygon_counts[index] = 0;
+    context.grounded[index] = false;
+    context.collision_enabled[index] = false;
     context.alive[index] = true;
     context.anchor_counts[index] = 0;
     context.alive_count += 1;
@@ -393,13 +439,88 @@ export fn engine_set_body(context: *EngineContext, index: u32, body_type: u8, sh
     context.shape_type[index] = shape_type;
     context.shape_radius[index] = radius;
     context.capsule_half_length[index] = if (shape_type == SHAPE_CAPSULE) half_length else 0;
+    context.shape_half_width[index] = radius;
+    context.shape_half_height[index] = radius + if (shape_type == SHAPE_CAPSULE) half_length else 0;
+    context.shape_rotation[index] = 0;
+    context.polygon_counts[index] = 0;
+    context.collision_enabled[index] = true;
     return true;
+}
+
+export fn engine_set_aabb(context: *EngineContext, index: u32, body_type: u8, half_width: f32, half_height: f32) bool {
+    if (index >= context.capacity or !context.alive[index] or body_type > BODY_DYNAMIC or half_width <= 0 or half_height <= 0) return false;
+    context.body_type[index] = body_type;
+    context.shape_type[index] = types.SHAPE_AABB;
+    context.shape_half_width[index] = half_width;
+    context.shape_half_height[index] = half_height;
+    context.shape_radius[index] = @sqrt(half_width * half_width + half_height * half_height);
+    context.capsule_half_length[index] = 0;
+    context.shape_rotation[index] = 0;
+    context.polygon_counts[index] = 0;
+    context.collision_enabled[index] = true;
+    return true;
+}
+
+export fn engine_set_obb(context: *EngineContext, index: u32, body_type: u8, half_width: f32, half_height: f32, rotation: f32) bool {
+    if (index >= context.capacity or !context.alive[index] or body_type > BODY_DYNAMIC or half_width <= 0 or half_height <= 0) return false;
+    context.body_type[index] = body_type;
+    context.shape_type[index] = types.SHAPE_OBB;
+    context.shape_half_width[index] = half_width;
+    context.shape_half_height[index] = half_height;
+    context.shape_radius[index] = @sqrt(half_width * half_width + half_height * half_height);
+    context.capsule_half_length[index] = 0;
+    context.shape_rotation[index] = rotation;
+    context.polygon_counts[index] = 0;
+    return true;
+}
+
+export fn engine_set_polygon(context: *EngineContext, index: u32, body_type: u8, vertices: [*]const f32, vertex_count: u8, rotation: f32) bool {
+    if (index >= context.capacity or !context.alive[index] or body_type > BODY_DYNAMIC or vertex_count < 3 or vertex_count > types.MAX_POLYGON_VERTICES) return false;
+    context.body_type[index] = body_type;
+    context.shape_type[index] = types.SHAPE_POLYGON;
+    context.polygon_counts[index] = vertex_count;
+    context.shape_rotation[index] = rotation;
+    var maximum_radius: f32 = 0;
+    for (0..vertex_count) |vertex| {
+        const x = vertices[vertex * 2];
+        const y = vertices[vertex * 2 + 1];
+        context.polygon_vertices[index * types.MAX_POLYGON_VERTICES * 2 + vertex * 2] = x;
+        context.polygon_vertices[index * types.MAX_POLYGON_VERTICES * 2 + vertex * 2 + 1] = y;
+        maximum_radius = @max(maximum_radius, @sqrt(x * x + y * y));
+    }
+    context.shape_radius[index] = maximum_radius;
+    context.capsule_half_length[index] = 0;
+    context.collision_enabled[index] = true;
+    return true;
+}
+
+export fn engine_add_static_aabb(context: *EngineContext, x: f32, y: f32, half_width: f32, half_height: f32) u32 {
+    if (half_width <= 0 or half_height <= 0) return types.INVALID_INDEX;
+    for (0..types.MAX_STATIC_COLLIDERS) |index| {
+        if (!context.static_collider_alive[index]) {
+            context.static_collider_alive[index] = true;
+            context.static_collider_x[index] = x;
+            context.static_collider_y[index] = y;
+            context.static_collider_half_width[index] = half_width;
+            context.static_collider_half_height[index] = half_height;
+            return @intCast(index);
+        }
+    }
+    return types.INVALID_INDEX;
+}
+
+export fn engine_clear_static_colliders(context: *EngineContext) void {
+    @memset(&context.static_collider_alive, false);
+}
+
+export fn engine_is_grounded(context: *const EngineContext, index: u32) bool {
+    if (index >= context.capacity or !context.alive[index]) return false;
+    return context.grounded[index];
 }
 
 export fn engine_test_collision(context: *const EngineContext, first: u32, second: u32) bool {
     if (first >= context.capacity or second >= context.capacity or !context.alive[first] or !context.alive[second] or first == second) return false;
-    const radius_sum = context.shape_radius[first] + context.shape_radius[second];
-    return math.shapeDistanceSquared(context, first, second) <= radius_sum * radius_sum;
+    return math.shapeContact(context, first, second) != null;
 }
 
 export fn engine_raycast(context: *const EngineContext, ax: f32, ay: f32, bx: f32, by: f32, output: *RaycastHit) bool {
@@ -605,4 +726,46 @@ export fn engine_update(context: *EngineContext, dt: f32) void {
 
 export fn add_numbers(a: c_int, b: c_int) c_int {
     return a + b;
+}
+
+test "dynamic bodies resolve with impulses" {
+    const context = engine_create(4, 8, 8, 16) orelse unreachable;
+    defer engine_destroy(context);
+    const first = engine_spawn(context, 1, -3, 0, 10, 0, 0);
+    const second = engine_spawn(context, 2, 3, 0, -10, 0, 0);
+    try std.testing.expect(engine_set_body(context, first, BODY_DYNAMIC, SHAPE_CIRCLE, 2, 0));
+    try std.testing.expect(engine_set_body(context, second, BODY_DYNAMIC, SHAPE_CIRCLE, 2, 0));
+    engine_update(context, 0.2);
+    try std.testing.expect(context.velocities_x[first] < 0);
+    try std.testing.expect(context.velocities_x[second] > 0);
+}
+
+test "fast dynamic body stops at static platform" {
+    const context = engine_create(2, 8, 8, 16) orelse unreachable;
+    defer engine_destroy(context);
+    const body = engine_spawn(context, 1, 0, 0, 0, 1000, 0);
+    try std.testing.expect(engine_set_aabb(context, body, BODY_DYNAMIC, 1, 1));
+    try std.testing.expect(engine_add_static_aabb(context, 0, 5, 10, 1) != INVALID_INDEX);
+    engine_update(context, 0.02);
+    try std.testing.expect(context.positions_y[body] <= 4.01);
+    try std.testing.expect(engine_is_grounded(context, body));
+}
+
+test "polygon shapes and polygon raycasts use exact boundaries" {
+    const context = engine_create(4, 8, 8, 16) orelse unreachable;
+    defer engine_destroy(context);
+    const box = engine_spawn(context, 1, 10, 10, 0, 0, 0);
+    const polygon = engine_spawn(context, 2, 13, 10, 0, 0, 0);
+    try std.testing.expect(engine_set_aabb(context, box, BODY_STATIC, 2, 2));
+    try std.testing.expect(engine_set_obb(context, polygon, BODY_STATIC, 2, 2, @as(f32, std.math.pi) / 4));
+    try std.testing.expect(engine_test_collision(context, box, polygon));
+    engine_rebuild_spatial(context);
+    var hit: RaycastHit = undefined;
+    try std.testing.expect(engine_raycast(context, 0, 10, 20, 10, &hit));
+    try std.testing.expectEqual(box, hit.entity_index);
+    try std.testing.expect(!engine_raycast(context, 0, 7, 20, 7, &hit));
+
+    const triangle = [_]f32{ -2, 2, 0, -2, 2, 2 };
+    try std.testing.expect(engine_set_polygon(context, polygon, BODY_STATIC, &triangle, 3, 0));
+    try std.testing.expect(engine_test_collision(context, box, polygon));
 }

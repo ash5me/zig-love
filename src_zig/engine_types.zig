@@ -4,8 +4,10 @@ const builtin = @import("builtin");
 pub const INVALID_INDEX: u32 = std.math.maxInt(u32);
 pub const EVENT_QUEUE_CAPACITY: usize = 256;
 pub const FRAME_ARENA_CAPACITY: usize = 64 * 1024;
+pub const MAX_POLYGON_VERTICES: usize = 8;
+pub const MAX_STATIC_COLLIDERS: usize = 256;
 pub const SNAPSHOT_MAGIC: u32 = 0x5A47454E;
-pub const SNAPSHOT_VERSION: u32 = 1;
+pub const SNAPSHOT_VERSION: u32 = 2;
 
 pub const InputState = extern struct {
     buttons: u32,
@@ -38,6 +40,9 @@ pub const BODY_KINEMATIC: u8 = 1;
 pub const BODY_DYNAMIC: u8 = 2;
 pub const SHAPE_CIRCLE: u8 = 1;
 pub const SHAPE_CAPSULE: u8 = 2;
+pub const SHAPE_AABB: u8 = 3;
+pub const SHAPE_OBB: u8 = 4;
+pub const SHAPE_POLYGON: u8 = 5;
 
 pub const EVENT_PLAY_SOUND: u32 = 1;
 pub const EVENT_PLAYER_DIED: u32 = 2;
@@ -130,6 +135,18 @@ pub const EngineContext = struct {
     shape_type: []u8,
     shape_radius: []f32,
     capsule_half_length: []f32,
+    shape_half_width: []f32,
+    shape_half_height: []f32,
+    shape_rotation: []f32,
+    polygon_counts: []u8,
+    polygon_vertices: []f32,
+    grounded: []bool,
+    collision_enabled: []bool,
+    static_collider_alive: [MAX_STATIC_COLLIDERS]bool,
+    static_collider_x: [MAX_STATIC_COLLIDERS]f32,
+    static_collider_y: [MAX_STATIC_COLLIDERS]f32,
+    static_collider_half_width: [MAX_STATIC_COLLIDERS]f32,
+    static_collider_half_height: [MAX_STATIC_COLLIDERS]f32,
     gravity: f32,
     telemetry: Telemetry,
 };

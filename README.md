@@ -50,6 +50,10 @@ Sum from Zig: 42
 - Entity pool with spawn, destroy, and reuse logic
 - Position, velocity, render order, and sprite state management
 - Physics state: static, kinematic, and dynamic bodies
+- Dynamic-vs-dynamic collision response with impulses, restitution, and friction
+- Circle, capsule, AABB, OBB, and convex polygon collision primitives
+- Adaptive substep continuous collision detection for fast-moving bodies
+- Native static AABB colliders and grounded contact reporting
 - Collision tests and raycast queries over a spatial grid
 - Pathfinding requests with incremental stepping
 - Snapshot serialization and restore support
@@ -80,28 +84,92 @@ zig-out/bin/             Built native libraries and output artifacts
 
 ## Core Engine API
 
-The engine exports a native API used by Lua via FFI, including:
+The engine exports the following native API through LuaJIT FFI.
+
+### Lifecycle and diagnostics
 
 - `engine_create(...)`
 - `engine_destroy(...)`
+- `engine_entity_capacity(...)`
+- `engine_alive_count(...)`
+- `engine_telemetry(...)`
+- `engine_update(...)`
+
+### Entity state
+
 - `engine_spawn(...)`
 - `engine_destroy_entity(...)`
+- `engine_find_entity(...)`
+- `engine_anchor_entity(...)`
+- `engine_release_entity(...)`
+- `engine_entity_anchor_count(...)`
 - `engine_set_position(...)`
 - `engine_set_velocity(...)`
-- `engine_set_input(...)`
-- `engine_update(...)`
+- `engine_positions_x(...)`
+- `engine_positions_y(...)`
+- `engine_velocities_x(...)`
+- `engine_velocities_y(...)`
+- `engine_sprite_ids(...)`
+- `engine_set_gravity(...)`
+- `engine_get_gravity(...)`
+
+### Physics and collision
+
+- `engine_set_body(...)` for circles and capsules
+- `engine_set_aabb(...)`
+- `engine_set_obb(...)`
+- `engine_set_polygon(...)` for convex polygons
+- `engine_add_static_aabb(...)`
+- `engine_clear_static_colliders(...)`
+- `engine_is_grounded(...)`
+- `engine_test_collision(...)`
 - `engine_raycast(...)`
+
+### Spatial and rendering state
+
+- `engine_rebuild_spatial(...)`
 - `engine_query_cell(...)`
-- `engine_pathfind_begin(...)`
-- `engine_pathfind_step(...)`
-- `engine_snapshot_write(...)`
-- `engine_snapshot_read(...)`
+- `engine_set_render_z(...)`
+- `engine_sort_render_order(...)`
+- `engine_render_order(...)`
+- `engine_render_count(...)`
 - `engine_camera_set(...)`
 - `engine_camera_matrix(...)`
+
+### Animation
+
 - `engine_animation_set(...)`
 - `engine_current_sprite_frame_id(...)`
-- `engine_set_body(...)`
-- `engine_test_collision(...)`
+
+### Input and events
+
+- `engine_set_input(...)`
+- `engine_next_event(...)`
+- `engine_pending_event_count(...)`
+
+### Frame memory
+
+- `engine_frame_begin(...)`
+- `engine_frame_alloc(...)`
+- `engine_frame_arena_used(...)`
+- `engine_frame_arena_capacity(...)`
+
+### Snapshots
+
+- `engine_snapshot_size(...)`
+- `engine_snapshot_write(...)`
+- `engine_snapshot_read(...)`
+
+### Pathfinding
+
+- `engine_pathfind_begin(...)`
+- `engine_pathfind_step(...)`
+- `engine_pathfind_state(...)`
+- `engine_pathfind_length(...)`
+
+### Sanity check
+
+- `add_numbers(...)`
 
 ## Debug Controls
 
