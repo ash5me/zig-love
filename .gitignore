@@ -5,6 +5,9 @@ zig-out/
 # Love2D packages
 *.love
 
+# Vendored dependencies
+vendor/
+
 # Windows and editor files
 *.user
 *.suo
