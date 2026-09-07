@@ -451,6 +451,10 @@ export fn engine_reserve_entities(context: *EngineContext, additional_capacity: 
 export fn engine_alive_count(context: *const EngineContext) usize {
     return context.alive_count;
 }
+
+export fn engine_entity_alive(context: *const EngineContext, index: u32) bool {
+    return index < context.capacity and types.isAlive(context, index);
+}
 export fn engine_telemetry(context: *EngineContext) *Telemetry {
     context.telemetry.entity_capacity = @intCast(context.capacity);
     context.telemetry.dropped_events = context.dropped_events;

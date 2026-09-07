@@ -62,6 +62,7 @@ void engine_destroy(EngineContext* context);
 size_t engine_entity_capacity(const EngineContext* context);
 bool engine_reserve_entities(EngineContext* context, size_t additional_capacity);
 size_t engine_alive_count(const EngineContext* context);
+bool engine_entity_alive(const EngineContext* context, uint32_t index);
 Telemetry* engine_telemetry(EngineContext* context);
 void engine_set_gravity(EngineContext* context, float gravity);
 float engine_get_gravity(const EngineContext* context);

@@ -105,6 +105,7 @@ main.lua                 LÖVE entry point and FFI bridge setup
 game_logic.lua           Reloadable gameplay logic
 modules/
   assets.lua            Cached asset/VFS facade
+  camera_manager.lua    Forward-only camera and arena trigger manager
   events.lua             Bidirectional native event facade
   audio.lua              Spatial audio command consumer
   combat.lua             Declarative hitbox/hurtbox combat registry

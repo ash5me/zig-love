@@ -148,6 +148,7 @@ function love.load()
         render_order = render_order,
         camera_matrix = camera_matrix,
         camera_transform = camera_transform,
+        camera_state = camera_state,
         telemetry = zig.engine_telemetry(engine_context),
         paused = false,
         draw_us = 0,
@@ -170,8 +171,10 @@ function love.load()
     local Combat = require("modules.combat")
     local PlayerFSM = require("modules.player_fsm")
     local EnemyAI = require("modules.enemy_ai")
+    local CameraManager = require("modules.camera_manager")
     runtime.combat = Combat.new(runtime)
     runtime.enemy_slots = EnemyAI.Slots(2)
+    runtime.camera_manager = CameraManager.new(runtime)
     runtime.new_player_fsm = function(owner, callbacks)
         return PlayerFSM.new({ combat = runtime.combat, owner = owner, input = runtime.input, callbacks = callbacks })
     end
@@ -232,6 +235,7 @@ function love.update(dt)
         end
         logic.update(runtime, dt)
         runtime.combat:resolve()
+        runtime.camera_manager:update(dt)
     end
 end
 
