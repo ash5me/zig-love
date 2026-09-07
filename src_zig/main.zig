@@ -125,6 +125,8 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
     errdefer allocator.free(grounded);
     const collision_enabled = allocator.alloc(bool, capacity) catch return null;
     errdefer allocator.free(collision_enabled);
+    const tilemap_tiles = allocator.alloc(u32, types.MAX_TILEMAP_TILES) catch return null;
+    errdefer allocator.free(tilemap_tiles);
     const context = allocator.create(EngineContext) catch return null;
 
     @memset(ids, 0);
@@ -161,6 +163,7 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
     @memset(polygon_vertices, 0);
     @memset(grounded, false);
     @memset(collision_enabled, false);
+    @memset(tilemap_tiles, 0);
     context.* = .{
         .registry = ecs.Registry.init(allocator),
         .capacity = capacity,
@@ -221,6 +224,33 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
         .static_collider_y = [_]f32{0} ** types.MAX_STATIC_COLLIDERS,
         .static_collider_half_width = [_]f32{0} ** types.MAX_STATIC_COLLIDERS,
         .static_collider_half_height = [_]f32{0} ** types.MAX_STATIC_COLLIDERS,
+        .tilemap_width = 0,
+        .tilemap_height = 0,
+        .tilemap_tile_width = 0,
+        .tilemap_tile_height = 0,
+        .tilemap_tiles = tilemap_tiles,
+        .particle_alive = [_]bool{false} ** types.MAX_PARTICLES,
+        .particle_x = [_]f32{0} ** types.MAX_PARTICLES,
+        .particle_y = [_]f32{0} ** types.MAX_PARTICLES,
+        .particle_velocity_x = [_]f32{0} ** types.MAX_PARTICLES,
+        .particle_velocity_y = [_]f32{0} ** types.MAX_PARTICLES,
+        .particle_lifetime = [_]f32{0} ** types.MAX_PARTICLES,
+        .particle_max_lifetime = [_]f32{0} ** types.MAX_PARTICLES,
+        .particle_size = [_]f32{1} ** types.MAX_PARTICLES,
+        .particle_red = [_]f32{1} ** types.MAX_PARTICLES,
+        .particle_green = [_]f32{1} ** types.MAX_PARTICLES,
+        .particle_blue = [_]f32{1} ** types.MAX_PARTICLES,
+        .particle_alpha = [_]f32{1} ** types.MAX_PARTICLES,
+        .particle_count = 0,
+        .light_alive = [_]bool{false} ** types.MAX_LIGHTS,
+        .light_x = [_]f32{0} ** types.MAX_LIGHTS,
+        .light_y = [_]f32{0} ** types.MAX_LIGHTS,
+        .light_radius = [_]f32{0} ** types.MAX_LIGHTS,
+        .light_red = [_]f32{1} ** types.MAX_LIGHTS,
+        .light_green = [_]f32{1} ** types.MAX_LIGHTS,
+        .light_blue = [_]f32{1} ** types.MAX_LIGHTS,
+        .light_intensity = [_]f32{1} ** types.MAX_LIGHTS,
+        .light_count = 0,
         .gravity = 98.0,
         .telemetry = .{ .physics_us = 0, .spatial_sort_us = 0, .ffi_serialization_us = 0, .frame_us = 0 },
     };
@@ -265,6 +295,7 @@ export fn engine_destroy(context: ?*EngineContext) void {
     allocator.free(value.polygon_vertices);
     allocator.free(value.grounded);
     allocator.free(value.collision_enabled);
+    allocator.free(value.tilemap_tiles);
     allocator.destroy(value);
 }
 
@@ -297,6 +328,148 @@ export fn engine_velocities_y(context: *EngineContext) [*]f32 {
 }
 export fn engine_sprite_ids(context: *EngineContext) [*]u64 {
     return context.sprite_ids.ptr;
+}
+
+export fn engine_tilemap_create(context: *EngineContext, width: usize, height: usize, tile_width: f32, tile_height: f32) bool {
+    if (width == 0 or height == 0 or width > types.MAX_TILEMAP_TILES / height or tile_width <= 0 or tile_height <= 0) return false;
+    context.tilemap_width = width;
+    context.tilemap_height = height;
+    context.tilemap_tile_width = tile_width;
+    context.tilemap_tile_height = tile_height;
+    @memset(context.tilemap_tiles[0 .. width * height], 0);
+    return true;
+}
+
+export fn engine_tilemap_set_tile(context: *EngineContext, x: usize, y: usize, tile: u32) bool {
+    if (x >= context.tilemap_width or y >= context.tilemap_height) return false;
+    context.tilemap_tiles[y * context.tilemap_width + x] = tile;
+    return true;
+}
+
+export fn engine_tilemap_width(context: *const EngineContext) usize {
+    return context.tilemap_width;
+}
+export fn engine_tilemap_height(context: *const EngineContext) usize {
+    return context.tilemap_height;
+}
+export fn engine_tilemap_tile_width(context: *const EngineContext) f32 {
+    return context.tilemap_tile_width;
+}
+export fn engine_tilemap_tile_height(context: *const EngineContext) f32 {
+    return context.tilemap_tile_height;
+}
+export fn engine_tilemap_tiles(context: *EngineContext) [*]u32 {
+    return context.tilemap_tiles.ptr;
+}
+
+export fn engine_particle_spawn(context: *EngineContext, x: f32, y: f32, velocity_x: f32, velocity_y: f32, lifetime: f32, size: f32, red: f32, green: f32, blue: f32) u32 {
+    if (lifetime <= 0 or size <= 0) return INVALID_INDEX;
+    for (0..types.MAX_PARTICLES) |index| {
+        if (context.particle_alive[index]) continue;
+        context.particle_alive[index] = true;
+        context.particle_x[index] = x;
+        context.particle_y[index] = y;
+        context.particle_velocity_x[index] = velocity_x;
+        context.particle_velocity_y[index] = velocity_y;
+        context.particle_lifetime[index] = lifetime;
+        context.particle_max_lifetime[index] = lifetime;
+        context.particle_size[index] = size;
+        context.particle_red[index] = red;
+        context.particle_green[index] = green;
+        context.particle_blue[index] = blue;
+        context.particle_alpha[index] = 1;
+        context.particle_count += 1;
+        return @intCast(index);
+    }
+    return INVALID_INDEX;
+}
+
+export fn engine_particle_kill(context: *EngineContext, index: u32) bool {
+    if (index >= types.MAX_PARTICLES or !context.particle_alive[index]) return false;
+    context.particle_alive[index] = false;
+    context.particle_count -= 1;
+    return true;
+}
+
+export fn engine_particle_count(context: *const EngineContext) usize {
+    return context.particle_count;
+}
+export fn engine_particle_positions_x(context: *EngineContext) [*]f32 {
+    return &context.particle_x;
+}
+export fn engine_particle_positions_y(context: *EngineContext) [*]f32 {
+    return &context.particle_y;
+}
+export fn engine_particle_sizes(context: *EngineContext) [*]f32 {
+    return &context.particle_size;
+}
+export fn engine_particle_red(context: *EngineContext) [*]f32 {
+    return &context.particle_red;
+}
+export fn engine_particle_green(context: *EngineContext) [*]f32 {
+    return &context.particle_green;
+}
+export fn engine_particle_blue(context: *EngineContext) [*]f32 {
+    return &context.particle_blue;
+}
+export fn engine_particle_alpha(context: *EngineContext) [*]f32 {
+    return &context.particle_alpha;
+}
+export fn engine_particle_alive(context: *EngineContext) [*]bool {
+    return &context.particle_alive;
+}
+
+export fn engine_light_create(context: *EngineContext, x: f32, y: f32, radius: f32, red: f32, green: f32, blue: f32, intensity: f32) u32 {
+    if (radius <= 0 or intensity <= 0) return INVALID_INDEX;
+    for (0..types.MAX_LIGHTS) |index| {
+        if (context.light_alive[index]) continue;
+        context.light_alive[index] = true;
+        context.light_x[index] = x;
+        context.light_y[index] = y;
+        context.light_radius[index] = radius;
+        context.light_red[index] = red;
+        context.light_green[index] = green;
+        context.light_blue[index] = blue;
+        context.light_intensity[index] = intensity;
+        context.light_count += 1;
+        return @intCast(index);
+    }
+    return INVALID_INDEX;
+}
+
+export fn engine_light_destroy(context: *EngineContext, index: u32) bool {
+    if (index >= types.MAX_LIGHTS or !context.light_alive[index]) return false;
+    context.light_alive[index] = false;
+    context.light_count -= 1;
+    return true;
+}
+
+export fn engine_light_count(context: *const EngineContext) usize {
+    return context.light_count;
+}
+export fn engine_light_positions_x(context: *EngineContext) [*]f32 {
+    return &context.light_x;
+}
+export fn engine_light_positions_y(context: *EngineContext) [*]f32 {
+    return &context.light_y;
+}
+export fn engine_light_radii(context: *EngineContext) [*]f32 {
+    return &context.light_radius;
+}
+export fn engine_light_red(context: *EngineContext) [*]f32 {
+    return &context.light_red;
+}
+export fn engine_light_green(context: *EngineContext) [*]f32 {
+    return &context.light_green;
+}
+export fn engine_light_blue(context: *EngineContext) [*]f32 {
+    return &context.light_blue;
+}
+export fn engine_light_intensity(context: *EngineContext) [*]f32 {
+    return &context.light_intensity;
+}
+export fn engine_light_alive(context: *EngineContext) [*]bool {
+    return &context.light_alive;
 }
 
 export fn engine_set_position(context: *EngineContext, index: u32, x: f32, y: f32) bool {
@@ -767,4 +940,21 @@ test "polygon shapes and polygon raycasts use exact boundaries" {
     const triangle = [_]f32{ -2, 2, 0, -2, 2, 2 };
     try std.testing.expect(engine_set_polygon(context, polygon, BODY_STATIC, &triangle, 3, 0));
     try std.testing.expect(engine_test_collision(context, box, polygon));
+}
+
+test "native render pools accept and expire transient data" {
+    const context = engine_create(2, 8, 8, 16) orelse unreachable;
+    defer engine_destroy(context);
+    try std.testing.expect(engine_tilemap_create(context, 2, 2, 16, 16));
+    try std.testing.expect(engine_tilemap_set_tile(context, 1, 1, 7));
+    try std.testing.expectEqual(@as(u32, 7), context.tilemap_tiles[3]);
+    const particle = engine_particle_spawn(context, 0, 0, 10, 0, 0.1, 2, 1, 0, 0);
+    try std.testing.expect(particle != INVALID_INDEX);
+    try std.testing.expectEqual(@as(usize, 1), context.particle_count);
+    engine_update(context, 0.2);
+    try std.testing.expectEqual(@as(usize, 0), context.particle_count);
+    const light = engine_light_create(context, 0, 0, 20, 1, 1, 1, 1);
+    try std.testing.expect(light != INVALID_INDEX);
+    try std.testing.expect(engine_light_destroy(context, light));
+    try std.testing.expectEqual(@as(usize, 0), context.light_count);
 }

@@ -169,6 +169,21 @@ pub fn updateAnimations(context: *EngineContext, dt: f32) void {
     }
 }
 
+pub fn updateParticles(context: *EngineContext, dt: f32) void {
+    for (0..types.MAX_PARTICLES) |index| {
+        if (!context.particle_alive[index]) continue;
+        context.particle_lifetime[index] -= dt;
+        if (context.particle_lifetime[index] <= 0) {
+            context.particle_alive[index] = false;
+            context.particle_count -= 1;
+            continue;
+        }
+        context.particle_x[index] += context.particle_velocity_x[index] * dt;
+        context.particle_y[index] += context.particle_velocity_y[index] * dt;
+        context.particle_alpha[index] = @max(0, context.particle_lifetime[index] / context.particle_max_lifetime[index]);
+    }
+}
+
 pub fn engineTick(context: *EngineContext, dt: f32) void {
     const pressed = context.input.buttons & ~context.previous_buttons;
     if ((pressed & 1) != 0) pushEvent(context, EVENT_PLAY_SOUND, 0);
@@ -195,6 +210,7 @@ pub fn engineTick(context: *EngineContext, dt: f32) void {
     }
 
     updateAnimations(context, dt);
+    updateParticles(context, dt);
     sortRenderOrder(context);
     rebuildSpatialGrid(context);
 }

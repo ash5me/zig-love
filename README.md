@@ -190,6 +190,18 @@ The engine exports the following native API through LuaJIT FFI.
 - `engine_animation_set(...)`
 - `engine_current_sprite_frame_id(...)`
 
+### Tilemaps, particles, and lights
+
+The native runtime provides fixed-capacity render data pools. `modules/tilemap.lua`
+loads orthogonal Tiled JSON maps, uploads tile IDs through the tilemap API, and
+renders an optional tileset image. `modules/particles.lua` and
+`modules/lighting.lua` render native particle and point-light pools without
+allocating per-frame entity objects in Lua.
+
+- `engine_tilemap_create(...)`, `engine_tilemap_set_tile(...)`, `engine_tilemap_tiles(...)`
+- `engine_particle_spawn(...)`, `engine_particle_count(...)`, `engine_particle_*`
+- `engine_light_create(...)`, `engine_light_destroy(...)`, `engine_light_count(...)`, `engine_light_*`
+
 ### Input and events
 
 - `engine_set_input(...)`

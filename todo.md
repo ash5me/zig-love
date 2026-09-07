@@ -10,9 +10,9 @@ Primitive Platformer Logic: In platformer.lua, platform landing is manually calc
 2. Rendering & Batching Pipeline
 No Sprite Batching or Instancing: Render loops in logic.lua call individual love.graphics.circle calls per entity. Drawing thousands of entities this way introduces massive CPU-to-GPU call overhead in Lua.
 
-Missing Tilemap Engine: There is no native support for loading, parsing, or rendering tilemaps (e.g., Tiled .tmx / JSON format).
+Tilemap Engine: Orthogonal Tiled JSON loading, native tile storage, and LÖVE rendering are now provided by `modules/tilemap.lua`.
 
-No Particle or Lighting Systems: No built-in particle emitter system in Zig for high-count FX, nor 2D light/shadow projection primitives.
+Particle and Lighting Systems: Native fixed-capacity particle and point-light pools now provide high-count FX, radial lighting, and rectangle shadow projection through `modules/particles.lua` and `modules/lighting.lua`.
 
 3. Engine Architecture & Memory Management
 Basic Fixed-Size Memory Limits: Context memory capacities are pre-allocated at startup without dynamic pool resizing, ring-buffer cleanup, or graceful fallback mechanisms when capacity fills up.

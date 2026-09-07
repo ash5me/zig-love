@@ -118,6 +118,8 @@ function love.load()
     assert(nearby_count > 0, "Spatial grid query returned no entities")
     assert(zig.engine_pathfind_begin(engine_context, 0, 0, 20, 15), "Pathfinding request rejected")
     local AssetManager = require("modules.assets")
+    local Particles = require("modules.particles")
+    local Lighting = require("modules.lighting")
     assets = AssetManager.new()
     runtime = {
         context = engine_context,
@@ -141,6 +143,8 @@ function love.load()
         event_player_died = EVENT_PLAYER_DIED,
         event_path_ready = EVENT_PATH_READY,
     }
+    runtime.particles = Particles.new(runtime)
+    runtime.lighting = Lighting.new(runtime)
     runtime.spawn_entities = function(count)
         for _ = 1, math.max(0, math.min(count, 100)) do
             local id = ffi.new("uint64_t", debug_sequence)
@@ -186,6 +190,11 @@ function love.draw()
     local ok, err = pcall(function()
         if logic and runtime then
             logic.draw(runtime)
+            if runtime.particles then runtime.particles:draw() end
+            if runtime.lighting then
+                runtime.lighting:draw_shadows()
+                runtime.lighting:draw()
+            end
         end
     end)
     if not ok then

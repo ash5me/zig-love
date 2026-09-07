@@ -7,6 +7,9 @@ pub const EVENT_QUEUE_CAPACITY: usize = 256;
 pub const FRAME_ARENA_CAPACITY: usize = 64 * 1024;
 pub const MAX_POLYGON_VERTICES: usize = 8;
 pub const MAX_STATIC_COLLIDERS: usize = 256;
+pub const MAX_TILEMAP_TILES: usize = 262144;
+pub const MAX_PARTICLES: usize = 4096;
+pub const MAX_LIGHTS: usize = 128;
 pub const SNAPSHOT_MAGIC: u32 = 0x5A47454E;
 pub const SNAPSHOT_VERSION: u32 = 2;
 
@@ -146,6 +149,33 @@ pub const EngineContext = struct {
     static_collider_y: [MAX_STATIC_COLLIDERS]f32,
     static_collider_half_width: [MAX_STATIC_COLLIDERS]f32,
     static_collider_half_height: [MAX_STATIC_COLLIDERS]f32,
+    tilemap_width: usize,
+    tilemap_height: usize,
+    tilemap_tile_width: f32,
+    tilemap_tile_height: f32,
+    tilemap_tiles: []u32,
+    particle_alive: [MAX_PARTICLES]bool,
+    particle_x: [MAX_PARTICLES]f32,
+    particle_y: [MAX_PARTICLES]f32,
+    particle_velocity_x: [MAX_PARTICLES]f32,
+    particle_velocity_y: [MAX_PARTICLES]f32,
+    particle_lifetime: [MAX_PARTICLES]f32,
+    particle_max_lifetime: [MAX_PARTICLES]f32,
+    particle_size: [MAX_PARTICLES]f32,
+    particle_red: [MAX_PARTICLES]f32,
+    particle_green: [MAX_PARTICLES]f32,
+    particle_blue: [MAX_PARTICLES]f32,
+    particle_alpha: [MAX_PARTICLES]f32,
+    particle_count: usize,
+    light_alive: [MAX_LIGHTS]bool,
+    light_x: [MAX_LIGHTS]f32,
+    light_y: [MAX_LIGHTS]f32,
+    light_radius: [MAX_LIGHTS]f32,
+    light_red: [MAX_LIGHTS]f32,
+    light_green: [MAX_LIGHTS]f32,
+    light_blue: [MAX_LIGHTS]f32,
+    light_intensity: [MAX_LIGHTS]f32,
+    light_count: usize,
     gravity: f32,
     telemetry: Telemetry,
 };
