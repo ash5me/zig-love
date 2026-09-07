@@ -33,6 +33,25 @@ Run the native engine tests with:
 zig build test
 ```
 
+## Native Debugging
+
+Install the CodeLLDB VS Code extension and set the `LOVE_EXE` environment variable to your LÖVE executable, for example:
+
+```powershell
+$env:LOVE_EXE = "C:\Program Files\LOVE\love.exe"
+```
+
+Start the `Debug Game` configuration. It builds the native library with `Debug` symbols, launches LÖVE with this workspace, and lets CodeLLDB stop in Zig code, including `__zig_panic`.
+
+The native target is a dynamic library loaded by LÖVE, so it cannot be launched directly as `my_game`. To debug a standalone Zig executable or test binary with the matching compiler toolchain, use:
+
+```powershell
+zig lldb .\zig-out\bin\my_game.exe
+zig gdb .\zig-out\bin\my_game.exe
+```
+
+Replace `my_game.exe` with the executable produced by the command you are debugging. Build performance variants with `-Dproduction=true` for `ReleaseSafe`; keep `Debug` for normal native debugging.
+
 The native library is output to:
 
 ```text
@@ -361,6 +380,8 @@ for faster verification builds during development.
 ```powershell
 zig build -Dproduction=true
 ```
+
+Development builds use `Debug` safety checks by default. Production and cross-target builds use `ReleaseSafe`, preserving runtime safety checks while enabling optimization. The native engine uses Zig's `GeneralPurposeAllocator`; `love.quit()` deinitializes it and reports leaked allocations.
 
 ## Bindings Regeneration
 

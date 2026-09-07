@@ -3,8 +3,8 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     const entt = b.dependency("entt", .{});
     const target = b.standardTargetOptions(.{});
-    const production = b.option(bool, "production", "Build the native library with ReleaseFast") orelse false;
-    const optimize = if (production) .ReleaseFast else b.standardOptimizeOption(.{});
+    const production = b.option(bool, "production", "Build the native library with ReleaseSafe") orelse false;
+    const optimize = if (production) .ReleaseSafe else b.standardOptimizeOption(.{ .preferred_optimize_mode = .Debug });
 
     const root_module = b.createModule(.{
         .root_source_file = b.path("src_zig/main.zig"),
@@ -34,7 +34,7 @@ pub fn build(b: *std.Build) void {
     release_step.dependOn(b.getInstallStep());
 
     const cross_optimize = b.option(bool, "cross-release", "Optimize cross-target verification builds") orelse true;
-    const cross_mode: std.builtin.OptimizeMode = if (cross_optimize) .ReleaseFast else .Debug;
+    const cross_mode: std.builtin.OptimizeMode = if (cross_optimize) .ReleaseSafe else .Debug;
     const windows_module = b.createModule(.{
         .root_source_file = b.path("src_zig/main.zig"),
         .target = b.resolveTargetQuery(.{ .cpu_arch = .x86_64, .os_tag = .windows, .abi = .gnu }),

@@ -54,6 +54,10 @@ function PlayerFSM:change_state(next_state)
     if callback then callback(next_state) end
 end
 
+function PlayerFSM:stop_motion()
+    self.combat.runtime.zig.engine_set_25d_velocity(self.combat.runtime.context, self.owner, 0, 0, 0)
+end
+
 function PlayerFSM:begin_grab(enemy)
     self.grabbed_enemy = enemy
     enemy:set_grabbed(self)
@@ -149,12 +153,18 @@ function PlayerFSM:update(dt)
             end
         end
     elseif self.state == STATE_HITSTUN then
-        if self.state_time >= 0.28 then self:change_state(STATE_IDLE) end
+        if self.state_time >= 0.28 then
+            self:stop_motion()
+            self:change_state(STATE_IDLE)
+        end
     elseif self.state == STATE_KNOCKDOWN then
         if self.state_time >= 0.8 then
             self.invulnerable = true
         end
-        if self.state_time >= 1.1 then self:change_state(STATE_IDLE) end
+        if self.state_time >= 1.1 then
+            self:stop_motion()
+            self:change_state(STATE_IDLE)
+        end
     end
 
     if attack_states[self.state] then

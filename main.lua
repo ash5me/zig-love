@@ -318,6 +318,7 @@ function love.quit()
     end
     if engine_context ~= nil then
         zig.engine_destroy(engine_context)
+        assert(zig.engine_allocator_deinit(), "Native allocator reported leaked memory")
         engine_context = nil
         positions_x = nil
         positions_y = nil

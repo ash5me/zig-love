@@ -35,6 +35,11 @@ const WindowsTimer = types.WindowsTimer;
 const PosixTimer = types.PosixTimer;
 
 var timer_frequency: u64 = 0;
+var general_purpose_allocator = std.heap.DebugAllocator(.{}){};
+
+fn engineAllocator() std.mem.Allocator {
+    return general_purpose_allocator.allocator();
+}
 
 fn timestampNs() u64 {
     if (builtin.os.tag == .windows) {
@@ -58,7 +63,7 @@ fn timestampNs() u64 {
 
 export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, cell_size: f32) ?*EngineContext {
     if (capacity == 0 or grid_width == 0 or grid_height == 0 or cell_size <= 0) return null;
-    const allocator = std.heap.page_allocator;
+    const allocator = engineAllocator();
     const ids = allocator.alloc(u64, capacity) catch return null;
     errdefer allocator.free(ids);
     const positions_x = allocator.alloc(f32, capacity) catch return null;
@@ -309,7 +314,7 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
 
 export fn engine_destroy(context: ?*EngineContext) void {
     const value = context orelse return;
-    const allocator = std.heap.page_allocator;
+    const allocator = engineAllocator();
     value.registry.deinit();
     allocator.free(value.ids);
     allocator.free(value.positions_x);
@@ -357,13 +362,17 @@ export fn engine_destroy(context: ?*EngineContext) void {
     allocator.destroy(value);
 }
 
+export fn engine_allocator_deinit() bool {
+    return general_purpose_allocator.deinit() == .ok;
+}
+
 export fn engine_entity_capacity(context: *const EngineContext) usize {
     return context.capacity;
 }
 
 fn resizeEntityStorage(context: *EngineContext, requested_capacity: usize) bool {
     if (requested_capacity <= context.capacity) return true;
-    const allocator = std.heap.page_allocator;
+    const allocator = engineAllocator();
     const old_capacity = context.capacity;
     context.ids = allocator.realloc(context.ids, requested_capacity) catch return false;
     @memset(context.ids[old_capacity..], 0);

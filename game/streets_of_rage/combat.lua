@@ -162,6 +162,7 @@ function Combat:resolve()
         end
         if attack_state then attack_state.hit_targets[hit_key] = true end
         runtime.hit_stop_remaining = math.max(runtime.hit_stop_remaining or 0, hit.hit_stop)
+        runtime.zig.engine_set_25d_velocity(runtime.context, hit.victim, hit.knockback.x, hit.knockback.z, hit.knockback.y)
         for _, callback in ipairs(self.callbacks) do callback(hit) end
         ::continue::
     end

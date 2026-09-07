@@ -59,6 +59,7 @@ typedef struct {
 
 EngineContext* engine_create(size_t capacity, size_t grid_width, size_t grid_height, float cell_size);
 void engine_destroy(EngineContext* context);
+bool engine_allocator_deinit(void);
 size_t engine_entity_capacity(const EngineContext* context);
 bool engine_reserve_entities(EngineContext* context, size_t additional_capacity);
 size_t engine_alive_count(const EngineContext* context);

@@ -7,6 +7,8 @@ local STATE_FLANK = "Flank"
 local STATE_ATTACK = "Attack"
 local STATE_GRABBED = "Grabbed"
 local STATE_PROJECTILE = "Projectile"
+local STATE_HITSTUN = "Hitstun"
+local STATE_KNOCKDOWN = "Knockdown"
 local Slots = {}
 Slots.__index = Slots
 
@@ -78,6 +80,7 @@ function EnemyAI.new(options)
         acceleration = options.acceleration or 700,
         friction = options.friction or 900,
     }, EnemyAI)
+    self.combat:on_hit(function(hit) self:on_hit(hit) end)
     return self
 end
 
@@ -106,6 +109,19 @@ end
 function EnemyAI:release_grab()
     self.grabbed_by = nil
     self:change_state(STATE_APPROACH)
+end
+
+function EnemyAI:stop_motion()
+    self.runtime.zig.engine_set_25d_velocity(self.runtime.context, self.owner, 0, 0, 0)
+end
+
+function EnemyAI:on_hit(hit)
+    if hit.victim ~= self.owner or self.state == STATE_KNOCKDOWN then return end
+    self.slots:release(self.owner)
+    self.combat.attacks[self.owner] = nil
+    self.state_time = 0
+    self.state = math.abs(hit.knockback.y or 0) >= 50 and STATE_KNOCKDOWN or STATE_HITSTUN
+    if self.callbacks.on_state_changed then self.callbacks.on_state_changed(self.state, self.owner) end
 end
 
 function EnemyAI:launch_projectile(vx, vz)
@@ -176,6 +192,24 @@ function EnemyAI:update(dt)
         local x, z = self:position()
         runtime.zig.engine_set_25d_position(runtime.context, self.owner, x + self.projectile_vx * dt, z + self.projectile_vz * dt, runtime.positions_y[self.owner])
         if self.combat:is_attacking(self.owner) then self:register_attack() else self:change_state(STATE_APPROACH) end
+        self:register_hurtbox()
+        return
+    end
+    if self.state == STATE_HITSTUN then
+        self.state_time = self.state_time + dt
+        if self.state_time >= 0.28 then
+            self:stop_motion()
+            self:change_state(STATE_APPROACH)
+        end
+        self:register_hurtbox()
+        return
+    end
+    if self.state == STATE_KNOCKDOWN then
+        self.state_time = self.state_time + dt
+        if self.state_time >= 1.1 then
+            self:stop_motion()
+            self:change_state(STATE_APPROACH)
+        end
         self:register_hurtbox()
         return
     end
