@@ -10,6 +10,8 @@ pub const MAX_STATIC_COLLIDERS: usize = 256;
 pub const MAX_TILEMAP_TILES: usize = 262144;
 pub const MAX_PARTICLES: usize = 4096;
 pub const MAX_LIGHTS: usize = 128;
+pub const MAX_COMBAT_BOXES: usize = 512;
+pub const COMBAT_EVENT_CAPACITY: usize = 256;
 pub const SNAPSHOT_MAGIC: u32 = 0x5A47454E;
 pub const SNAPSHOT_VERSION: u32 = 4;
 
@@ -22,6 +24,32 @@ pub const InputState = extern struct {
 pub const EngineEvent = extern struct {
     id: u32,
     value: u32,
+};
+
+pub const CombatHitEvent = extern struct {
+    attacker: u32,
+    victim: u32,
+    damage: f32,
+    knockback_x: f32,
+    knockback_y: f32,
+    knockback_z: f32,
+    hit_stop: f32,
+};
+
+pub const CombatBox = struct {
+    active: bool,
+    owner: u32,
+    x: f32,
+    y: f32,
+    z: f32,
+    half_width: f32,
+    half_height: f32,
+    half_depth: f32,
+    damage: f32,
+    knockback_x: f32,
+    knockback_y: f32,
+    knockback_z: f32,
+    hit_stop: f32,
 };
 
 pub const AudioCommand = extern struct {
@@ -209,6 +237,14 @@ pub const EngineContext = struct {
     light_blue: [MAX_LIGHTS]f32,
     light_intensity: [MAX_LIGHTS]f32,
     light_count: usize,
+    hitboxes: [MAX_COMBAT_BOXES]CombatBox,
+    hurtboxes: [MAX_COMBAT_BOXES]CombatBox,
+    hitbox_count: usize,
+    hurtbox_count: usize,
+    combat_events: [COMBAT_EVENT_CAPACITY]CombatHitEvent,
+    combat_event_read: usize,
+    combat_event_write: usize,
+    combat_event_count: usize,
     gravity: f32,
     telemetry: Telemetry,
 };

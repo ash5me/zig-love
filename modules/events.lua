@@ -31,4 +31,9 @@ function Events:poll()
     end
 end
 
+function Events:on_combat_hit(handler)
+    assert(type(handler) == "function", "combat hit handler must be a function")
+    self.combat_hit_handler = handler
+end
+
 return Events

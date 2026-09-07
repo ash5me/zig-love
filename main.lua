@@ -15,7 +15,7 @@ local EVENT_PLAY_SOUND, EVENT_PLAYER_DIED, EVENT_PATH_READY = 1, 2, 3
 local PATH_WORKING, PATH_FOUND = 1, 2
 local BODY_STATIC, BODY_KINEMATIC, BODY_DYNAMIC = 0, 1, 2
 local SHAPE_CIRCLE, SHAPE_CAPSULE = 1, 2
-local engine_context, positions_x, positions_y, positions_z, velocities_x, velocities_y, velocities_z, shadow_positions_x, shadow_positions_y, depth_order, sprite_ids, query_results, input_state, event
+local engine_context, positions_x, positions_y, positions_z, velocities_x, velocities_y, velocities_z, shadow_positions_x, shadow_positions_y, depth_order, sprite_ids, query_results, input_state, event, combat_event
 local render_order, camera_matrix, camera_transform, camera_state
 local first_entity_id
 local first_physics_index, static_position_x, physics_checked = INVALID_INDEX, 0, false
@@ -72,6 +72,7 @@ function love.load()
     query_results = ffi.new("uint32_t[?]", ENTITY_CAPACITY)
     input_state = ffi.new("InputState")
     event = ffi.new("EngineEvent")
+    combat_event = ffi.new("CombatHitEvent")
 
     for index = 0, ENTITY_CAPACITY - 1 do
         local id = fnv1a32("entity:" .. index)
@@ -157,6 +158,8 @@ function love.load()
         event_player_died = EVENT_PLAYER_DIED,
         event_path_ready = EVENT_PATH_READY,
         ffi = ffi,
+        combat_event = combat_event,
+        hit_stop_remaining = 0,
     }
     runtime.particles = Particles.new(runtime)
     runtime.lighting = Lighting.new(runtime)
@@ -164,6 +167,8 @@ function love.load()
     runtime.events = Events.new(runtime)
     runtime.input = Input.new()
     runtime.audio = Audio.new(runtime)
+    local Combat = require("modules.combat")
+    runtime.combat = Combat.new(runtime)
     runtime.events:on(EVENT_PLAY_SOUND, function()
         runtime.status_text = "Play sound event"
     end)
@@ -198,6 +203,12 @@ function love.update(dt)
         debug_ui:update(runtime)
     end
     if not runtime.paused then
+        if runtime.hit_stop_remaining > 0 then
+            runtime.hit_stop_remaining = math.max(0, runtime.hit_stop_remaining - dt)
+            return
+        end
+        runtime.hit_stop_remaining = math.max(0, runtime.hit_stop_remaining - dt)
+        runtime.combat:begin_frame(dt)
         zig.engine_update(engine_context, dt)
         assert(tonumber(zig.engine_frame_arena_used(engine_context)) == 0, "Frame arena did not reset")
         if not physics_checked then
@@ -205,6 +216,7 @@ function love.update(dt)
             physics_checked = true
         end
         logic.update(runtime, dt)
+        runtime.combat:resolve()
     end
 end
 

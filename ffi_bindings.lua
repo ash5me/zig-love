@@ -11,6 +11,20 @@ typedef struct {
     uint32_t value;
 } EngineEvent;
 typedef struct {
+    uint32_t attacker;
+    uint32_t victim;
+    float damage;
+    float knockback_x;
+    float knockback_y;
+    float knockback_z;
+    float hit_stop;
+} CombatHitEvent;
+void engine_combat_clear(EngineContext* context);
+bool engine_combat_register_hitbox(EngineContext* context, uint32_t owner, float x, float y, float z, float width, float height, float depth, float damage, float knockback_x, float knockback_y, float knockback_z, float hit_stop);
+bool engine_combat_register_hurtbox(EngineContext* context, uint32_t owner, float x, float y, float z, float width, float height, float depth);
+size_t engine_combat_resolve(EngineContext* context);
+bool engine_next_combat_hit(EngineContext* context, CombatHitEvent* output);
+typedef struct {
     uint64_t sound_id;
     float source_x;
     float source_y;

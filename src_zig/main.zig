@@ -11,6 +11,7 @@ pub const EngineEvent = types.EngineEvent;
 pub const AudioCommand = types.AudioCommand;
 pub const Telemetry = types.Telemetry;
 pub const RaycastHit = types.RaycastHit;
+pub const CombatHitEvent = types.CombatHitEvent;
 pub const CameraState = types.CameraState;
 const EngineContext = types.EngineContext;
 const SnapshotHeader = types.SnapshotHeader;
@@ -292,6 +293,14 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
         .light_blue = [_]f32{1} ** types.MAX_LIGHTS,
         .light_intensity = [_]f32{1} ** types.MAX_LIGHTS,
         .light_count = 0,
+        .hitboxes = undefined,
+        .hurtboxes = undefined,
+        .hitbox_count = 0,
+        .hurtbox_count = 0,
+        .combat_events = undefined,
+        .combat_event_read = 0,
+        .combat_event_write = 0,
+        .combat_event_count = 0,
         .gravity = 98.0,
         .telemetry = .{ .physics_us = 0, .spatial_sort_us = 0, .ffi_serialization_us = 0, .frame_us = 0, .entity_capacity = @intCast(capacity), .dropped_events = 0 },
     };
@@ -1035,6 +1044,61 @@ export fn engine_pending_event_count(context: *const EngineContext) usize {
     return context.event_count;
 }
 
+fn validCombatBox(box: *const types.CombatBox) bool {
+    return box.active and box.half_width > 0 and box.half_height > 0 and box.half_depth > 0;
+}
+
+export fn engine_combat_clear(context: *EngineContext) void {
+    context.hitbox_count = 0;
+    context.hurtbox_count = 0;
+    context.combat_event_read = 0;
+    context.combat_event_write = 0;
+    context.combat_event_count = 0;
+    for (&context.hitboxes) |*box| box.active = false;
+    for (&context.hurtboxes) |*box| box.active = false;
+}
+
+export fn engine_combat_register_hitbox(context: *EngineContext, owner: u32, x: f32, y: f32, z: f32, width: f32, height: f32, depth: f32, damage: f32, knockback_x: f32, knockback_y: f32, knockback_z: f32, hit_stop: f32) bool {
+    if (context.hitbox_count >= types.MAX_COMBAT_BOXES or width <= 0 or height <= 0 or depth <= 0) return false;
+    context.hitboxes[context.hitbox_count] = .{ .active = true, .owner = owner, .x = x, .y = y, .z = z, .half_width = width * 0.5, .half_height = height * 0.5, .half_depth = depth * 0.5, .damage = damage, .knockback_x = knockback_x, .knockback_y = knockback_y, .knockback_z = knockback_z, .hit_stop = hit_stop };
+    context.hitbox_count += 1;
+    return true;
+}
+
+export fn engine_combat_register_hurtbox(context: *EngineContext, owner: u32, x: f32, y: f32, z: f32, width: f32, height: f32, depth: f32) bool {
+    if (context.hurtbox_count >= types.MAX_COMBAT_BOXES or width <= 0 or height <= 0 or depth <= 0) return false;
+    context.hurtboxes[context.hurtbox_count] = .{ .active = true, .owner = owner, .x = x, .y = y, .z = z, .half_width = width * 0.5, .half_height = height * 0.5, .half_depth = depth * 0.5, .damage = 0, .knockback_x = 0, .knockback_y = 0, .knockback_z = 0, .hit_stop = 0 };
+    context.hurtbox_count += 1;
+    return true;
+}
+
+export fn engine_combat_resolve(context: *EngineContext) usize {
+    var hits: usize = 0;
+    for (context.hitboxes[0..context.hitbox_count]) |*hitbox| {
+        if (!validCombatBox(hitbox)) continue;
+        for (context.hurtboxes[0..context.hurtbox_count]) |*hurtbox| {
+            if (!validCombatBox(hurtbox) or hitbox.owner == hurtbox.owner) continue;
+            const overlap_x = @abs(hitbox.x - hurtbox.x) <= hitbox.half_width + hurtbox.half_width;
+            const overlap_y = @abs(hitbox.y - hurtbox.y) <= hitbox.half_height + hurtbox.half_height;
+            const overlap_z = @abs(hitbox.z - hurtbox.z) <= hitbox.half_depth + hurtbox.half_depth;
+            if (!overlap_x or !overlap_y or !overlap_z) continue;
+            if (context.combat_event_count == types.COMBAT_EVENT_CAPACITY) continue;
+            context.combat_events[context.combat_event_write] = .{ .attacker = hitbox.owner, .victim = hurtbox.owner, .damage = hitbox.damage, .knockback_x = hitbox.knockback_x, .knockback_y = hitbox.knockback_y, .knockback_z = hitbox.knockback_z, .hit_stop = hitbox.hit_stop };
+            context.combat_event_write = (context.combat_event_write + 1) % types.COMBAT_EVENT_CAPACITY;
+            context.combat_event_count += 1;
+            hits += 1;
+        }
+    }
+    return hits;
+}
+
+export fn engine_next_combat_hit(context: *EngineContext, output: *CombatHitEvent) bool {
+    if (context.combat_event_count == 0) return false;
+    output.* = context.combat_events[context.combat_event_read];
+    context.combat_event_read = (context.combat_event_read + 1) % types.COMBAT_EVENT_CAPACITY;
+    context.combat_event_count -= 1;
+    return true;
+}
 export fn engine_frame_begin(context: *EngineContext) void {
     context.frame_arena_offset = 0;
 }
@@ -1182,6 +1246,26 @@ test "fast dynamic body stops at static platform" {
     engine_update(context, 0.02);
     try std.testing.expect(context.positions_y[body] <= 4.01);
     try std.testing.expect(engine_is_grounded(context, body));
+}
+
+test "combat hitboxes resolve only against overlapping hurtboxes on depth" {
+    const context = engine_create(4, 8, 8, 16) orelse unreachable;
+    defer engine_destroy(context);
+    const attacker = engine_spawn(context, 1, 0, 0, 0, 0, 0);
+    const victim = engine_spawn(context, 2, 0, 0, 0, 0, 0);
+    engine_combat_clear(context);
+    try std.testing.expect(engine_combat_register_hitbox(context, attacker, 10, 20, 3, 20, 30, 4, 2, 50, 0, 12, 0.1));
+    try std.testing.expect(engine_combat_register_hurtbox(context, victim, 18, 20, 3, 20, 30, 4));
+    try std.testing.expectEqual(@as(usize, 1), engine_combat_resolve(context));
+    var hit: CombatHitEvent = undefined;
+    try std.testing.expect(engine_next_combat_hit(context, &hit));
+    try std.testing.expectEqual(attacker, hit.attacker);
+    try std.testing.expectEqual(victim, hit.victim);
+    try std.testing.expectEqual(@as(f32, 2), hit.damage);
+    engine_combat_clear(context);
+    try std.testing.expect(engine_combat_register_hitbox(context, attacker, 10, 20, 30, 20, 30, 4, 2, 50, 0, 12, 0.1));
+    try std.testing.expect(engine_combat_register_hurtbox(context, victim, 18, 20, 3, 20, 30, 4));
+    try std.testing.expectEqual(@as(usize, 0), engine_combat_resolve(context));
 }
 
 test "2.5D bodies collide on xz and publish depth and shadow state" {
