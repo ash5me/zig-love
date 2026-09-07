@@ -147,6 +147,11 @@ tools/
 zig-out/bin/             Built native libraries and output artifacts
 ```
 
+The complete native-engine reference, including the exported ABI, simulation
+order, storage limits, failure conventions, and snapshot format, is in
+[docs/ZIG_ENGINE.md](docs/ZIG_ENGINE.md). It intentionally documents only the
+Zig implementation; Lua systems are described separately in this README.
+
 ## ECS Architecture
 
 Gameplay architecture is separated by game mode. The existing platformer lives
