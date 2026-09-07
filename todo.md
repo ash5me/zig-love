@@ -1,32 +1,3 @@
-1. Robust Physics & Collision Resolution
-No Dynamic-vs-Dynamic Collision Response: While your engine_math.zig contains distance/overlap math (shapeDistanceSquared) and raycasts, the runtime doesn't resolve collisions between dynamic bodies (no impulse/penetration resolution, restitution, or friction math).
-
-Missing Shape Primitives: You currently support Circles and Capsules, but lack Axis-Aligned Bounding Boxes (AABB), Oriented Bounding Boxes (OBB), and Convex Polygons.
-
-No Continuous Collision Detection (CCD): Fast-moving dynamic entities will pass straight through thin platforms ("tunneling") because positional integration relies on simple Euler steps without sweeping.
-
-Primitive Platformer Logic: In platformer.lua, platform landing is manually calculated in Lua with hardcoded array iterations instead of relying on the Zig physics solver.
-
-2. Rendering & Batching Pipeline
-Sprite Batching: Entity rendering now uses one reusable LÖVE SpriteBatch populated from Zig's native render-order array; the procedural dot texture can be replaced by an atlas-backed batch when sprite assets are mapped.
-
-Tilemap Engine: Orthogonal Tiled JSON loading, native tile storage, and LÖVE rendering are now provided by `modules/tilemap.lua`.
-
-Particle and Lighting Systems: Native fixed-capacity particle and point-light pools now provide high-count FX, radial lighting, and rectangle shadow projection through `modules/particles.lua` and `modules/lighting.lua`.
-
-3. Engine Architecture & Memory Management
-Memory Management: Entity storage now grows automatically when the pool fills, `engine_reserve_entities` supports proactive growth, event overflow is counted, and `engine_clear_events` provides ring-buffer cleanup with graceful spawn failure if allocation cannot grow.
-
-Snapshot Serialization: Full restore now rebuilds ECS membership and includes simulation, event, tilemap, particle, and light state. XOR zero-run delta snapshots are available for rollback networking.
-
-Event Pipeline: `modules/events.lua` provides structured `on`, `emit`, `poll`, and `clear` operations over the native ring buffer, making the event path bidirectional.
-
-4. Audio, Input & Asset Pipelines
-Spatial Audio Engine: Zig now queues `AudioCommand` records with distance attenuation and stereo pan; `modules/audio.lua` applies those native parameters to LÖVE sources.
-
-Input Mapping: `modules/input.lua` provides rebindable named actions across keyboard, mouse, gamepad buttons, and analog axes while preserving the native action bitmask.
-
-No Asset Manager / VFS: No centralized pipeline for caching, loading, or hot-reloading textures, sound files, or level data.
 
 Building a real-time editor integrated directly into your engine workflow is a massive productivity boost. To do this with your current stack, the clean approach is to use Dear ImGui [linked via Zig] for the developer UI controls, while letting LÖVE 12 (SDL3) handle the viewport rendering and window events.
 Here is the architecture and concrete blueprint to build a high-QoL, real-time editor.
