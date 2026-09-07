@@ -75,6 +75,8 @@ Sum from Zig: 42
 - Pathfinding requests with incremental stepping
 - Full snapshot serialization and ECS restore support, plus XOR delta snapshots for rollback
 - Bidirectional event commands with Lua handler registration and overflow accounting
+- Native spatial audio commands with distance attenuation and stereo panning
+- Rebindable keyboard, mouse, gamepad, and analog input actions
 - Camera transform management
 - Animation state and frame selection in native code
 - Centralized asset manager with cached Lua, text, JSON, image, and sound loading
@@ -98,6 +100,8 @@ game_logic.lua           Reloadable gameplay logic
 modules/
   assets.lua            Cached asset/VFS facade
   events.lua             Bidirectional native event facade
+  audio.lua              Spatial audio command consumer
+  input.lua              Rebindable action mapping
   json.lua              Dependency-free JSON decoder
   ui.lua                 Debug panel / runtime controls
 game/
@@ -210,6 +214,11 @@ allocating per-frame entity objects in Lua.
 ### Input and events
 
 - `engine_set_input(...)`
+- `engine_set_audio_listener(...)`
+- `engine_emit_spatial_sound(...)`
+- `engine_next_audio_command(...)`
+- `engine_clear_audio_commands(...)`
+- `engine_audio_dropped_count(...)`
 - `engine_next_event(...)`
 - `engine_emit_event(...)`
 - `engine_clear_events(...)`
@@ -217,6 +226,10 @@ allocating per-frame entity objects in Lua.
 
 `modules/events.lua` provides `on`, `emit`, `poll`, and `clear` methods. Event
 overflow is counted in telemetry instead of being silently discarded.
+
+`modules/input.lua` maps named actions to multiple keyboard keys, mouse buttons,
+gamepad buttons, and analog axes. The resulting action mask remains compatible
+with the native `InputState` ABI.
 - `engine_pending_event_count(...)`
 
 ### Frame memory

@@ -122,6 +122,8 @@ function love.load()
     local Lighting = require("modules.lighting")
     local SpriteBatch = require("modules.sprite_batch")
     local Events = require("modules.events")
+    local Input = require("modules.input")
+    local Audio = require("modules.audio")
     assets = AssetManager.new()
     runtime = {
         context = engine_context,
@@ -144,11 +146,14 @@ function love.load()
         event_play_sound = EVENT_PLAY_SOUND,
         event_player_died = EVENT_PLAYER_DIED,
         event_path_ready = EVENT_PATH_READY,
+        ffi = ffi,
     }
     runtime.particles = Particles.new(runtime)
     runtime.lighting = Lighting.new(runtime)
     runtime.sprite_batch = SpriteBatch.new(zig.engine_entity_capacity(engine_context))
     runtime.events = Events.new(runtime)
+    runtime.input = Input.new()
+    runtime.audio = Audio.new(runtime)
     runtime.events:on(EVENT_PLAY_SOUND, function()
         runtime.status_text = "Play sound event"
     end)
@@ -174,16 +179,11 @@ function love.load()
 end
 
 function love.update(dt)
-    local buttons = 0
-    if love.mouse.isDown(1) then buttons = buttons + INPUT_PLAY_SOUND end
-    if love.keyboard.isDown("x") then buttons = buttons + INPUT_PLAYER_DIED end
-    if love.keyboard.isDown("w") then buttons = buttons + 4 end
-    if love.keyboard.isDown("a") then buttons = buttons + 8 end
-    if love.keyboard.isDown("s") then buttons = buttons + 16 end
-    if love.keyboard.isDown("d") then buttons = buttons + 32 end
-    input_state.buttons = buttons
+    input_state.buttons = runtime.input:buttons()
     input_state.mouse_x, input_state.mouse_y = love.mouse.getPosition()
     zig.engine_set_input(engine_context, input_state)
+    runtime.audio:update_listener(camera_state.x, camera_state.y)
+    runtime.audio:poll()
     if debug_ui_visible then
         debug_ui:update(runtime)
     end

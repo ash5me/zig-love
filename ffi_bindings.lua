@@ -11,6 +11,13 @@ typedef struct {
     uint32_t value;
 } EngineEvent;
 typedef struct {
+    uint64_t sound_id;
+    float source_x;
+    float source_y;
+    float volume;
+    float pan;
+} AudioCommand;
+typedef struct {
     uint64_t physics_us;
     uint64_t spatial_sort_us;
     uint64_t ffi_serialization_us;
@@ -106,6 +113,11 @@ uint32_t engine_find_entity(const EngineContext* context, uint64_t id);
 void engine_rebuild_spatial(EngineContext* context);
 size_t engine_query_cell(const EngineContext* context, int32_t cell_x, int32_t cell_y, uint32_t* output, size_t output_capacity);
 void engine_set_input(EngineContext* context, const InputState* input);
+void engine_set_audio_listener(EngineContext* context, float x, float y);
+bool engine_emit_spatial_sound(EngineContext* context, uint64_t sound_id, float source_x, float source_y, float max_distance, float base_volume);
+bool engine_next_audio_command(EngineContext* context, AudioCommand* output);
+void engine_clear_audio_commands(EngineContext* context);
+uint64_t engine_audio_dropped_count(const EngineContext* context);
 bool engine_next_event(EngineContext* context, EngineEvent* output);
 void engine_emit_event(EngineContext* context, uint32_t id, uint32_t value);
 void engine_clear_events(EngineContext* context);

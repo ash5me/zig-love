@@ -116,6 +116,26 @@ pub fn pushEvent(context: *EngineContext, id: u32, value: u32) void {
     context.event_count += 1;
 }
 
+pub fn pushSpatialSound(context: *EngineContext, sound_id: u64, source_x: f32, source_y: f32, max_distance: f32, base_volume: f32) void {
+    if (max_distance <= 0 or base_volume <= 0 or context.audio_count == types.EVENT_QUEUE_CAPACITY) {
+        if (context.audio_count == types.EVENT_QUEUE_CAPACITY) context.audio_dropped += 1;
+        return;
+    }
+    const dx = source_x - context.audio_listener_x;
+    const dy = source_y - context.audio_listener_y;
+    const distance = @sqrt(dx * dx + dy * dy);
+    const normalized_distance = @min(distance / max_distance, 1);
+    context.audio_commands[context.audio_write] = .{
+        .sound_id = sound_id,
+        .source_x = source_x,
+        .source_y = source_y,
+        .volume = base_volume * (1 - normalized_distance),
+        .pan = @max(-1, @min(1, dx / max_distance)),
+    };
+    context.audio_write = (context.audio_write + 1) % types.EVENT_QUEUE_CAPACITY;
+    context.audio_count += 1;
+}
+
 pub fn clearGrid(context: *EngineContext) void {
     @memset(context.grid_heads, INVALID_INDEX);
     @memset(context.next_in_cell, INVALID_INDEX);
@@ -189,7 +209,10 @@ pub fn updateParticles(context: *EngineContext, dt: f32) void {
 
 pub fn engineTick(context: *EngineContext, dt: f32) void {
     const pressed = context.input.buttons & ~context.previous_buttons;
-    if ((pressed & 1) != 0) pushEvent(context, EVENT_PLAY_SOUND, 0);
+    if ((pressed & 1) != 0) {
+        pushEvent(context, EVENT_PLAY_SOUND, 0);
+        pushSpatialSound(context, 1, context.audio_listener_x, context.audio_listener_y, 512, 1);
+    }
     if ((pressed & 2) != 0) pushEvent(context, EVENT_PLAYER_DIED, 0);
     context.previous_buttons = context.input.buttons;
 

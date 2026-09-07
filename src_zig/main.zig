@@ -8,6 +8,7 @@ const snapshot = @import("engine_snapshot.zig");
 
 pub const InputState = types.InputState;
 pub const EngineEvent = types.EngineEvent;
+pub const AudioCommand = types.AudioCommand;
 pub const Telemetry = types.Telemetry;
 pub const RaycastHit = types.RaycastHit;
 pub const CameraState = types.CameraState;
@@ -187,6 +188,13 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
         .event_write = 0,
         .event_count = 0,
         .dropped_events = 0,
+        .audio_commands = undefined,
+        .audio_read = 0,
+        .audio_write = 0,
+        .audio_count = 0,
+        .audio_listener_x = 0,
+        .audio_listener_y = 0,
+        .audio_dropped = 0,
         .path_visited = path_visited,
         .path_parent = path_parent,
         .path_queue = path_queue,
@@ -853,6 +861,51 @@ export fn engine_set_input(context: *EngineContext, input: *const InputState) vo
     context.input = input.*;
 }
 
+export fn engine_set_audio_listener(context: *EngineContext, x: f32, y: f32) void {
+    context.audio_listener_x = x;
+    context.audio_listener_y = y;
+}
+
+export fn engine_emit_spatial_sound(context: *EngineContext, sound_id: u64, source_x: f32, source_y: f32, max_distance: f32, base_volume: f32) bool {
+    if (max_distance <= 0 or base_volume <= 0 or context.audio_count == types.EVENT_QUEUE_CAPACITY) {
+        if (context.audio_count == types.EVENT_QUEUE_CAPACITY) context.audio_dropped += 1;
+        return false;
+    }
+    const dx = source_x - context.audio_listener_x;
+    const dy = source_y - context.audio_listener_y;
+    const distance = @sqrt(dx * dx + dy * dy);
+    const normalized_distance = @min(distance / max_distance, 1);
+    const attenuation = 1 - normalized_distance;
+    const pan = @max(-1, @min(1, dx / max_distance));
+    context.audio_commands[context.audio_write] = .{
+        .sound_id = sound_id,
+        .source_x = source_x,
+        .source_y = source_y,
+        .volume = base_volume * attenuation,
+        .pan = pan,
+    };
+    context.audio_write = (context.audio_write + 1) % types.EVENT_QUEUE_CAPACITY;
+    context.audio_count += 1;
+    return true;
+}
+
+export fn engine_next_audio_command(context: *EngineContext, output: *AudioCommand) bool {
+    if (context.audio_count == 0) return false;
+    output.* = context.audio_commands[context.audio_read];
+    context.audio_read = (context.audio_read + 1) % types.EVENT_QUEUE_CAPACITY;
+    context.audio_count -= 1;
+    return true;
+}
+
+export fn engine_clear_audio_commands(context: *EngineContext) void {
+    context.audio_read = context.audio_write;
+    context.audio_count = 0;
+}
+
+export fn engine_audio_dropped_count(context: *const EngineContext) u64 {
+    return context.audio_dropped;
+}
+
 export fn engine_next_event(context: *EngineContext, output: *EngineEvent) bool {
     if (context.event_count == 0) return false;
     output.* = context.events[context.event_read];
@@ -1075,6 +1128,17 @@ test "entity pools grow and custom events round trip" {
     try std.testing.expect(engine_next_event(context, &event));
     try std.testing.expectEqual(@as(u32, 99), event.id);
     try std.testing.expectEqual(@as(u32, 42), event.value);
+}
+
+test "spatial audio commands calculate attenuation and pan" {
+    const context = engine_create(1, 4, 4, 16) orelse unreachable;
+    defer engine_destroy(context);
+    engine_set_audio_listener(context, 0, 0);
+    try std.testing.expect(engine_emit_spatial_sound(context, 7, 50, 0, 100, 0.8));
+    var command: AudioCommand = undefined;
+    try std.testing.expect(engine_next_audio_command(context, &command));
+    try std.testing.expectApproxEqAbs(@as(f32, 0.4), command.volume, 0.0001);
+    try std.testing.expectApproxEqAbs(@as(f32, 0.5), command.pan, 0.0001);
 }
 
 test "snapshot restores membership, render pools, and applies deltas" {

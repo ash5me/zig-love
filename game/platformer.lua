@@ -59,12 +59,12 @@ function platformer.update(state, dt)
     
     -- Horizontal movement inputs
     local direction = 0
-    if love.keyboard.isDown("left") or love.keyboard.isDown("a") then direction = direction - 1 end
-    if love.keyboard.isDown("right") or love.keyboard.isDown("d") then direction = direction + 1 end
+    if state.input:is_down("move_left") then direction = direction - 1 end
+    if state.input:is_down("move_right") then direction = direction + 1 end
     player.vx = direction * 190
 
     -- Jump trigger
-    if (love.keyboard.isDown("space") or love.keyboard.isDown("up") or love.keyboard.isDown("w")) and player.grounded then
+    if state.input:is_down("jump") and player.grounded then
         player.vy, player.grounded = jump_speed, false
     end
 

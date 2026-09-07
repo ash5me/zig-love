@@ -22,9 +22,9 @@ Snapshot Serialization: Full restore now rebuilds ECS membership and includes si
 Event Pipeline: `modules/events.lua` provides structured `on`, `emit`, `poll`, and `clear` operations over the native ring buffer, making the event path bidirectional.
 
 4. Audio, Input & Asset Pipelines
-No Native Spatial Audio Engine: Audio events in Zig (EVENT_PLAY_SOUND) rely entirely on Lua catching the event ID and manually calling love.audio, with no spatial attenuation (distance-based volume/panning) calculated on the Zig side.
+Spatial Audio Engine: Zig now queues `AudioCommand` records with distance attenuation and stereo pan; `modules/audio.lua` applies those native parameters to LÖVE sources.
 
-No Rebindable Input Mapping: Input is handled via raw bitmasks (context.input.buttons), with no action-mapping system (e.g., mapping "Jump" to both Space and a Controller A button).
+Input Mapping: `modules/input.lua` provides rebindable named actions across keyboard, mouse, gamepad buttons, and analog axes while preserving the native action bitmask.
 
 No Asset Manager / VFS: No centralized pipeline for caching, loading, or hot-reloading textures, sound files, or level data.
 

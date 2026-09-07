@@ -24,6 +24,14 @@ pub const EngineEvent = extern struct {
     value: u32,
 };
 
+pub const AudioCommand = extern struct {
+    sound_id: u64,
+    source_x: f32,
+    source_y: f32,
+    volume: f32,
+    pan: f32,
+};
+
 pub const Telemetry = extern struct {
     physics_us: u64,
     spatial_sort_us: u64,
@@ -121,6 +129,13 @@ pub const EngineContext = struct {
     event_write: usize,
     event_count: usize,
     dropped_events: u64,
+    audio_commands: [EVENT_QUEUE_CAPACITY]AudioCommand,
+    audio_read: usize,
+    audio_write: usize,
+    audio_count: usize,
+    audio_listener_x: f32,
+    audio_listener_y: f32,
+    audio_dropped: u64,
     path_visited: []bool,
     path_parent: []u32,
     path_queue: []u32,
