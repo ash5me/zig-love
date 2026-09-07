@@ -19,6 +19,11 @@ local function sign(value)
     return value < 0 and -1 or 1
 end
 
+local function approach(value, target, amount)
+    if value < target then return math.min(value + amount, target) end
+    return math.max(value - amount, target)
+end
+
 function EnemyAI.Slots(max_attackers)
     return setmetatable({
         max_attackers = max_attackers or 2,
@@ -68,6 +73,10 @@ function EnemyAI.new(options)
         grabbed_by = nil,
         projectile_vx = 0,
         projectile_vz = 0,
+        velocity_x = 0,
+        velocity_z = 0,
+        acceleration = options.acceleration or 700,
+        friction = options.friction or 900,
     }, EnemyAI)
     return self
 end
@@ -77,6 +86,9 @@ function EnemyAI:change_state(next_state)
     if self.state == STATE_ATTACK then self.slots:release(self.owner) end
     self.state = next_state
     self.state_time = 0
+    if next_state == STATE_ATTACK or next_state == STATE_GRABBED or next_state == STATE_PROJECTILE then
+        self.velocity_x, self.velocity_z = 0, 0
+    end
     if self.callbacks.on_state_changed then self.callbacks.on_state_changed(next_state, self.owner) end
 end
 
@@ -116,7 +128,10 @@ function EnemyAI:move(dx, dz, dt)
     local runtime = self.runtime
     local x, z = self:position()
     if math.abs(dx) > 0.01 then self.facing = sign(dx) end
-    runtime.zig.engine_set_25d_position(runtime.context, self.owner, x + dx * self.speed * dt, z + dz * self.speed * dt, runtime.positions_y[self.owner])
+    local target_x, target_z = dx * self.speed, dz * self.speed
+    self.velocity_x = dx == 0 and approach(self.velocity_x, 0, self.friction * dt) or approach(self.velocity_x, target_x, self.acceleration * dt)
+    self.velocity_z = dz == 0 and approach(self.velocity_z, 0, self.friction * dt) or approach(self.velocity_z, target_z, self.acceleration * dt)
+    runtime.zig.engine_set_25d_position(runtime.context, self.owner, x + self.velocity_x * dt, z + self.velocity_z * dt, runtime.positions_y[self.owner])
 end
 
 function EnemyAI:register_hurtbox()
@@ -147,6 +162,7 @@ function EnemyAI:update(dt)
     end
     self.state_time = self.state_time + dt
     if self.state == STATE_GRABBED then
+        self.velocity_x, self.velocity_z = 0, 0
         local player = self.grabbed_by
         if player then
             local runtime = self.runtime
