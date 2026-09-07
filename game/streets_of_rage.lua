@@ -6,6 +6,10 @@ local FLOOR_Y = 440
 local PLAYER = 0
 local ENEMIES = { 1, 2, 3 }
 
+local function screen_x(state, world_x)
+    return world_x - state.camera_manager.x + WIDTH * 0.5
+end
+
 local function load_frames(state, folder, prefix, count)
     local frames = {}
     for index = 1, count do
@@ -53,7 +57,7 @@ function StreetsOfRage.update(state, dt)
         }
         for _, index in ipairs({ PLAYER, 1, 2, 3 }) do
             state.zig.engine_set_25d_position(state.context, index, index == PLAYER and 180 or 480 + index * 80, index == PLAYER and 0 or (index % 2 == 0 and 38 or -38), 0)
-            state.zig.engine_set_ground_aabb(state.context, index, 2, 18, 12)
+            state.zig.engine_set_ground_aabb(state.context, index, 1, 18, 12)
         end
         state.player_fsm = state.new_player_fsm(PLAYER, {
             on_state_changed = function(next_state)
@@ -110,16 +114,16 @@ function StreetsOfRage.draw(state)
 
     local player_x, player_z = state.positions_x[PLAYER], state.positions_z[PLAYER]
     local player_frames = state.player_fsm:get_state() == "Idle" and game.frames.player_walk or game.frames.player
-    draw_actor(PLAYER, player_frames, player_x, player_z, state.player_fsm.facing, game.elapsed, { 0.86, 0.18, 0.27 })
+    draw_actor(PLAYER, player_frames, screen_x(state, player_x), player_z, state.player_fsm.facing, game.elapsed, { 0.86, 0.18, 0.27 })
     for _, enemy in ipairs(game.enemies) do
         local index = enemy.owner
         local enemy_frames = enemy:get_state() == "Approach" and game.frames.enemy_walk or game.frames.enemy
-        draw_actor(enemy, enemy_frames, state.positions_x[index], state.positions_z[index], enemy.facing, game.elapsed, { 0.66, 0.18, 0.14 })
+        draw_actor(enemy, enemy_frames, screen_x(state, state.positions_x[index]), state.positions_z[index], enemy.facing, game.elapsed, { 0.66, 0.18, 0.14 })
     end
 
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.print("NIGHT SHIFT", 24, 20)
-    love.graphics.print("A/D: move   W/S: depth   J/Z: attack   Close range: grab   K/Q: throw", 24, 44)
+    love.graphics.print("A/D: move   W/S: depth   J/Z: attack   Space: jump attack   Close range: grab   K/Q: throw", 24, 44)
     love.graphics.print("State: " .. state.player_fsm:get_state(), 24, 70)
     if state.camera_manager:get_prompt() then
         love.graphics.setColor(1, 0.78, 0.22, 1)

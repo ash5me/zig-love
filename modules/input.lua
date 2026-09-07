@@ -8,9 +8,14 @@ function Input.new()
             play_sound = { bit = 1, keys = { "mouse1" } },
             player_died = { bit = 2, keys = { "x" } },
             jump = { bit = 4, keys = { "space", "w", "up" }, gamepad = "a" },
+            jump_attack = { bit = 1024, keys = { "space" }, gamepad = "a" },
             move_left = { bit = 8, keys = { "a", "left" }, axis = -1 },
             move_right = { bit = 32, keys = { "d", "right" }, axis = 1 },
             move_down = { bit = 16, keys = { "s", "down" } },
+            move_up = { bit = 64, keys = { "w", "up" } },
+            attack = { bit = 128, keys = { "j", "z", "mouse1" }, gamepad = "x" },
+            pick_up = { bit = 256, keys = { "e" }, gamepad = "y" },
+            throw = { bit = 512, keys = { "k", "q" }, gamepad = "rightshoulder" },
         },
     }, Input)
 end

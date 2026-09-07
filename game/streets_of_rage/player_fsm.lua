@@ -111,7 +111,7 @@ function PlayerFSM:update(dt)
     self.state_frame = math.floor(self.state_time / (1 / 12)) + 1
 
     local attack_pressed, attack_down = self:pressed("attack", self.previous_attack)
-    local jump_pressed, jump_down = self:pressed("jump", self.previous_jump)
+    local jump_pressed, jump_down = self:pressed("jump_attack", self.previous_jump)
     self.previous_attack, self.previous_jump = attack_down, jump_down
 
     if self.state == STATE_IDLE then
