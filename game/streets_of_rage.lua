@@ -35,6 +35,25 @@ local function draw_actor(actor, frames, x, z, facing, elapsed, color)
     end
 end
 
+local function draw_prop(prop, x, z, camera_x)
+    if not prop.image then return end
+    local scale = prop.scale or 1
+    local screen_y = FLOOR_Y - z * 0.45
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.draw(prop.image, x - camera_x + WIDTH * 0.5, screen_y, 0, scale, scale, prop.image:getWidth() * 0.5, prop.image:getHeight())
+end
+
+local function draw_layer(image, camera_x, alpha)
+    if not image then return end
+    local scale = math.max(WIDTH / image:getWidth(), HEIGHT / image:getHeight())
+    local width = image:getWidth() * scale
+    local offset = -((camera_x * 0.22) % width)
+    love.graphics.setColor(1, 1, 1, alpha or 1)
+    for x = offset - width, WIDTH + width, width do
+        love.graphics.draw(image, x, 0, 0, scale, scale)
+    end
+end
+
 function StreetsOfRage.update(state, dt)
     local game = state.streets_of_rage
     if not game then
@@ -54,6 +73,14 @@ function StreetsOfRage.update(state, dt)
             player_walk = load_frames(state, "assets/Sprites/Brawler-Girl/Walk", "walk", 10),
             enemy = load_frames(state, "assets/Sprites/Enemy-Punk/Idle", "idle", 4),
             enemy_walk = load_frames(state, "assets/Sprites/Enemy-Punk/Walk", "walk", 4),
+        }
+        game.stage_back = state.assets:load_image("assets/Stage Layers/back.png")
+        game.stage_fore = state.assets:load_image("assets/Stage Layers/fore.png")
+        game.props = {
+            { image = state.assets:load_image("assets/Stage Layers/props/car.png"), x = 170, z = -30, scale = 0.9 },
+            { image = state.assets:load_image("assets/Stage Layers/props/barrel.png"), x = 360, z = 18, scale = 0.75 },
+            { image = state.assets:load_image("assets/Stage Layers/props/hydrant.png"), x = 760, z = -18, scale = 0.7 },
+            { image = state.assets:load_image("assets/Stage Layers/props/banner-hor/banner-hor1.png"), x = 560, z = 48, scale = 0.8 },
         }
         for _, index in ipairs({ PLAYER, 1, 2, 3 }) do
             state.zig.engine_set_25d_position(state.context, index, index == PLAYER and 180 or 480 + index * 80, index == PLAYER and 0 or (index % 2 == 0 and 38 or -38), 0)
@@ -98,19 +125,24 @@ end
 
 function StreetsOfRage.draw(state)
     local game = state.streets_of_rage
+    local camera_x = state.camera_manager.x
     love.graphics.clear(0.06, 0.07, 0.11, 1)
-    love.graphics.setColor(0.10, 0.12, 0.18, 1)
-    love.graphics.rectangle("fill", 0, 230, WIDTH, 220)
-    love.graphics.setColor(0.18, 0.16, 0.17, 1)
-    love.graphics.rectangle("fill", 0, 450, WIDTH, 150)
-    love.graphics.setColor(0.40, 0.34, 0.28, 1)
-    love.graphics.rectangle("fill", 0, FLOOR_Y + 36, WIDTH, 4)
-    for x = 0, WIDTH, 90 do
-        love.graphics.setColor(0.20, 0.22, 0.28, 1)
-        love.graphics.rectangle("fill", x, 300 + (x % 3) * 18, 56, 74)
-        love.graphics.setColor(0.72, 0.52, 0.24, 0.45)
-        love.graphics.rectangle("fill", x + 12, 316 + (x % 3) * 18, 10, 18)
+    draw_layer(game.stage_back, camera_x, 1)
+    if not game.stage_back then
+        love.graphics.setColor(0.10, 0.12, 0.18, 1)
+        love.graphics.rectangle("fill", 0, 230, WIDTH, 220)
+        love.graphics.setColor(0.18, 0.16, 0.17, 1)
+        love.graphics.rectangle("fill", 0, 450, WIDTH, 150)
+        love.graphics.setColor(0.40, 0.34, 0.28, 1)
+        love.graphics.rectangle("fill", 0, FLOOR_Y + 36, WIDTH, 4)
+        for x = 0, WIDTH, 90 do
+            love.graphics.setColor(0.20, 0.22, 0.28, 1)
+            love.graphics.rectangle("fill", x, 300 + (x % 3) * 18, 56, 74)
+            love.graphics.setColor(0.72, 0.52, 0.24, 0.45)
+            love.graphics.rectangle("fill", x + 12, 316 + (x % 3) * 18, 10, 18)
+        end
     end
+    for _, prop in ipairs(game.props or {}) do draw_prop(prop, prop.x, prop.z, camera_x) end
 
     local player_x, player_z = state.positions_x[PLAYER], state.positions_z[PLAYER]
     local player_frames = state.player_fsm:get_state() == "Idle" and game.frames.player_walk or game.frames.player
@@ -120,6 +152,7 @@ function StreetsOfRage.draw(state)
         local enemy_frames = enemy:get_state() == "Approach" and game.frames.enemy_walk or game.frames.enemy
         draw_actor(enemy, enemy_frames, screen_x(state, state.positions_x[index]), state.positions_z[index], enemy.facing, game.elapsed, { 0.66, 0.18, 0.14 })
     end
+    draw_layer(game.stage_fore, camera_x, 0.8)
 
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.print("NIGHT SHIFT", 24, 20)
