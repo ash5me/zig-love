@@ -15,3 +15,4 @@ vendor/
 *.swp
 Thumbs.db
 .DS_Store
+assets

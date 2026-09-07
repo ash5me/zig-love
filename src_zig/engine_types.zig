@@ -11,7 +11,7 @@ pub const MAX_TILEMAP_TILES: usize = 262144;
 pub const MAX_PARTICLES: usize = 4096;
 pub const MAX_LIGHTS: usize = 128;
 pub const SNAPSHOT_MAGIC: u32 = 0x5A47454E;
-pub const SNAPSHOT_VERSION: u32 = 3;
+pub const SNAPSHOT_VERSION: u32 = 4;
 
 pub const InputState = extern struct {
     buttons: u32,
@@ -116,8 +116,13 @@ pub const EngineContext = struct {
     ids: []u64,
     positions_x: []f32,
     positions_y: []f32,
+    positions_z: []f32,
     velocities_x: []f32,
     velocities_y: []f32,
+    velocities_z: []f32,
+    shadow_x: []f32,
+    shadow_y: []f32,
+    depth_order: []i32,
     sprite_ids: []u64,
     entities: []?ecs.Entity,
     grid_heads: []u32,
@@ -169,6 +174,9 @@ pub const EngineContext = struct {
     polygon_vertices: []f32,
     grounded: []bool,
     collision_enabled: []bool,
+    ground_collision_enabled: []bool,
+    ground_half_width: []f32,
+    ground_half_depth: []f32,
     static_collider_alive: [MAX_STATIC_COLLIDERS]bool,
     static_collider_x: [MAX_STATIC_COLLIDERS]f32,
     static_collider_y: [MAX_STATIC_COLLIDERS]f32,

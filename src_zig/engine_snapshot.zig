@@ -14,18 +14,18 @@ const SnapshotHeader = types.SnapshotHeader;
 pub fn snapshotPayloadSize(context: *const EngineContext) usize {
     return @sizeOf(SnapshotHeader) +
         @sizeOf(u64) * context.capacity * 2 +
-        @sizeOf(f32) * context.capacity * 4 +
+        @sizeOf(f32) * context.capacity * 6 +
         @sizeOf(u32) * context.capacity +
         @sizeOf(types.EngineEvent) * types.EVENT_QUEUE_CAPACITY +
         @sizeOf(bool) * context.grid_width * context.grid_height +
         @sizeOf(u32) * context.grid_width * context.grid_height * 2 +
         @sizeOf(types.CameraState) + @sizeOf(f32) * 9 +
-        @sizeOf(i32) * context.capacity + @sizeOf(u64) * context.capacity * 2 +
+        @sizeOf(i32) * context.capacity * 2 + @sizeOf(u64) * context.capacity * 2 +
         @sizeOf(u32) * context.capacity * 2 + @sizeOf(f32) * context.capacity * 2 +
         @sizeOf(bool) * context.capacity + @sizeOf(u8) * context.capacity * 2 +
-        @sizeOf(f32) * context.capacity * 5 + @sizeOf(u8) * context.capacity +
+        @sizeOf(f32) * context.capacity * 7 + @sizeOf(u8) * context.capacity +
         @sizeOf(f32) * context.capacity * types.MAX_POLYGON_VERTICES * 2 +
-        @sizeOf(bool) * context.capacity * 2 + @sizeOf(bool) * types.MAX_STATIC_COLLIDERS +
+        @sizeOf(bool) * context.capacity * 3 + @sizeOf(bool) * types.MAX_STATIC_COLLIDERS +
         @sizeOf(f32) * types.MAX_STATIC_COLLIDERS * 4 +
         @sizeOf(bool) * context.capacity +
         @sizeOf(u32) * types.MAX_TILEMAP_TILES +
@@ -170,8 +170,13 @@ pub fn snapshotWrite(context: *EngineContext, output: [*]u8, output_capacity: us
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.sprite_ids))) return 0;
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.positions_x))) return 0;
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.positions_y))) return 0;
+    if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.positions_z))) return 0;
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.velocities_x))) return 0;
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.velocities_y))) return 0;
+    if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.velocities_z))) return 0;
+    if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.shadow_x))) return 0;
+    if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.shadow_y))) return 0;
+    if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.depth_order))) return 0;
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.anchor_counts))) return 0;
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(alive))) return 0;
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.events[0..]))) return 0;
@@ -199,6 +204,7 @@ pub fn snapshotWrite(context: *EngineContext, output: [*]u8, output_capacity: us
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.polygon_vertices))) return 0;
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.grounded))) return 0;
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.collision_enabled))) return 0;
+    if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.ground_collision_enabled))) return 0;
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.static_collider_alive[0..]))) return 0;
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.static_collider_x[0..]))) return 0;
     if (!writeBytes(bytes, &offset, std.mem.sliceAsBytes(context.static_collider_y[0..]))) return 0;
@@ -267,8 +273,13 @@ pub fn snapshotRead(context: *EngineContext, input: [*]const u8, input_size: usi
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.sprite_ids))) return false;
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.positions_x))) return false;
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.positions_y))) return false;
+    if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.positions_z))) return false;
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.velocities_x))) return false;
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.velocities_y))) return false;
+    if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.velocities_z))) return false;
+    if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.shadow_x))) return false;
+    if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.shadow_y))) return false;
+    if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.depth_order))) return false;
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.anchor_counts))) return false;
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(alive))) return false;
     context.registry.deinit();
@@ -302,6 +313,7 @@ pub fn snapshotRead(context: *EngineContext, input: [*]const u8, input_size: usi
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.polygon_vertices))) return false;
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.grounded))) return false;
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.collision_enabled))) return false;
+    if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.ground_collision_enabled))) return false;
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.static_collider_alive[0..]))) return false;
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.static_collider_x[0..]))) return false;
     if (!readBytes(bytes, &offset, std.mem.sliceAsBytes(context.static_collider_y[0..]))) return false;

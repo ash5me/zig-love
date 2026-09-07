@@ -155,6 +155,9 @@ pub fn sortRenderOrder(context: *EngineContext) void {
     var count: usize = 0;
     for (0..context.capacity) |index| {
         if (!types.isAlive(context, index)) continue;
+        context.depth_order[index] = @intFromFloat(@round(context.positions_z[index] * 1000));
+        context.shadow_x[index] = context.positions_x[index];
+        context.shadow_y[index] = context.positions_z[index];
         context.render_order[count] = @intCast(index);
         count += 1;
     }
@@ -162,10 +165,49 @@ pub fn sortRenderOrder(context: *EngineContext) void {
     while (index < count) : (index += 1) {
         const value = context.render_order[index];
         var position = index;
-        while (position > 0 and context.render_z[context.render_order[position - 1]] > context.render_z[value]) : (position -= 1) {
+        while (position > 0 and renderKey(context, context.render_order[position - 1]) > renderKey(context, value)) : (position -= 1) {
             context.render_order[position] = context.render_order[position - 1];
         }
         context.render_order[position] = value;
+    }
+}
+
+fn renderKey(context: *const EngineContext, index: u32) i32 {
+    return if (context.ground_collision_enabled[index]) context.depth_order[index] else context.render_z[index];
+}
+
+fn solveGroundCollisions(context: *EngineContext) void {
+    for (0..4) |_| {
+        for (0..context.capacity) |first| {
+            if (!types.isAlive(context, first) or !context.ground_collision_enabled[first] or context.body_type[first] != BODY_DYNAMIC) continue;
+            for (first + 1..context.capacity) |second| {
+                if (!types.isAlive(context, second) or !context.ground_collision_enabled[second]) continue;
+                const dx = context.positions_x[first] - context.positions_x[second];
+                const dz = context.positions_z[first] - context.positions_z[second];
+                const overlap_x = context.ground_half_width[first] + context.ground_half_width[second] - @abs(dx);
+                const overlap_z = context.ground_half_depth[first] + context.ground_half_depth[second] - @abs(dz);
+                if (overlap_x <= 0 or overlap_z <= 0) continue;
+                const first_dynamic = context.body_type[first] == BODY_DYNAMIC;
+                const second_dynamic = context.body_type[second] == BODY_DYNAMIC;
+                if (overlap_x < overlap_z) {
+                    const direction: f32 = if (dx >= 0) 1 else -1;
+                    const first_share: f32 = if (second_dynamic) 0.5 else 1;
+                    const second_share: f32 = if (first_dynamic) 0.5 else 1;
+                    if (first_dynamic) context.positions_x[first] += direction * overlap_x * first_share;
+                    if (second_dynamic) context.positions_x[second] -= direction * overlap_x * second_share;
+                    if (first_dynamic) context.velocities_x[first] = 0;
+                    if (second_dynamic) context.velocities_x[second] = 0;
+                } else {
+                    const direction: f32 = if (dz >= 0) 1 else -1;
+                    const first_share: f32 = if (second_dynamic) 0.5 else 1;
+                    const second_share: f32 = if (first_dynamic) 0.5 else 1;
+                    if (first_dynamic) context.positions_z[first] += direction * overlap_z * first_share;
+                    if (second_dynamic) context.positions_z[second] -= direction * overlap_z * second_share;
+                    if (first_dynamic) context.velocities_z[first] = 0;
+                    if (second_dynamic) context.velocities_z[second] = 0;
+                }
+            }
+        }
     }
 }
 
@@ -231,8 +273,10 @@ pub fn engineTick(context: *EngineContext, dt: f32) void {
             if (context.body_type[index] == types.BODY_DYNAMIC) context.velocities_y[index] += context.gravity * step_dt;
             context.positions_x[index] += context.velocities_x[index] * step_dt;
             context.positions_y[index] += context.velocities_y[index] * step_dt;
+            if (context.ground_collision_enabled[index]) context.positions_z[index] += context.velocities_z[index] * step_dt;
         }
         solveCollisions(context);
+        solveGroundCollisions(context);
     }
 
     updateAnimations(context, dt);

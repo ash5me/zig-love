@@ -67,6 +67,8 @@ Sum from Zig: 42
 - Position, velocity, render order, and sprite state management
 - Reusable LÖVE SpriteBatch path for ordered entity rendering
 - Physics state: static, kinematic, and dynamic bodies
+- Optional 2.5D ground-plane bodies with `x/z` AABB collision and independent vertical `y` gravity
+- Lua-visible ground-shadow coordinates and automatic `z` depth ordering
 - Dynamic-vs-dynamic collision response with impulses, restitution, and friction
 - Circle, capsule, AABB, OBB, and convex polygon collision primitives
 - Adaptive substep continuous collision detection for fast-moving bodies

@@ -64,10 +64,20 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
     errdefer allocator.free(positions_x);
     const positions_y = allocator.alloc(f32, capacity) catch return null;
     errdefer allocator.free(positions_y);
+    const positions_z = allocator.alloc(f32, capacity) catch return null;
+    errdefer allocator.free(positions_z);
     const velocities_x = allocator.alloc(f32, capacity) catch return null;
     errdefer allocator.free(velocities_x);
     const velocities_y = allocator.alloc(f32, capacity) catch return null;
     errdefer allocator.free(velocities_y);
+    const velocities_z = allocator.alloc(f32, capacity) catch return null;
+    errdefer allocator.free(velocities_z);
+    const shadow_x = allocator.alloc(f32, capacity) catch return null;
+    errdefer allocator.free(shadow_x);
+    const shadow_y = allocator.alloc(f32, capacity) catch return null;
+    errdefer allocator.free(shadow_y);
+    const depth_order = allocator.alloc(i32, capacity) catch return null;
+    errdefer allocator.free(depth_order);
     const sprite_ids = allocator.alloc(u64, capacity) catch return null;
     errdefer allocator.free(sprite_ids);
     const entities = allocator.alloc(?ecs.Entity, capacity) catch return null;
@@ -126,6 +136,12 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
     errdefer allocator.free(grounded);
     const collision_enabled = allocator.alloc(bool, capacity) catch return null;
     errdefer allocator.free(collision_enabled);
+    const ground_collision_enabled = allocator.alloc(bool, capacity) catch return null;
+    errdefer allocator.free(ground_collision_enabled);
+    const ground_half_width = allocator.alloc(f32, capacity) catch return null;
+    errdefer allocator.free(ground_half_width);
+    const ground_half_depth = allocator.alloc(f32, capacity) catch return null;
+    errdefer allocator.free(ground_half_depth);
     const tilemap_tiles = allocator.alloc(u32, types.MAX_TILEMAP_TILES) catch return null;
     errdefer allocator.free(tilemap_tiles);
     const context = allocator.create(EngineContext) catch return null;
@@ -133,8 +149,13 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
     @memset(ids, 0);
     @memset(positions_x, 0);
     @memset(positions_y, 0);
+    @memset(positions_z, 0);
     @memset(velocities_x, 0);
     @memset(velocities_y, 0);
+    @memset(velocities_z, 0);
+    @memset(shadow_x, 0);
+    @memset(shadow_y, 0);
+    @memset(depth_order, 0);
     @memset(sprite_ids, 0);
     @memset(entities, null);
     @memset(grid_heads, INVALID_INDEX);
@@ -164,6 +185,9 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
     @memset(polygon_vertices, 0);
     @memset(grounded, false);
     @memset(collision_enabled, false);
+    @memset(ground_collision_enabled, false);
+    @memset(ground_half_width, 0);
+    @memset(ground_half_depth, 0);
     @memset(tilemap_tiles, 0);
     context.* = .{
         .registry = ecs.Registry.init(allocator),
@@ -175,8 +199,13 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
         .ids = ids,
         .positions_x = positions_x,
         .positions_y = positions_y,
+        .positions_z = positions_z,
         .velocities_x = velocities_x,
         .velocities_y = velocities_y,
+        .velocities_z = velocities_z,
+        .shadow_x = shadow_x,
+        .shadow_y = shadow_y,
+        .depth_order = depth_order,
         .sprite_ids = sprite_ids,
         .entities = entities,
         .grid_heads = grid_heads,
@@ -228,6 +257,9 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
         .polygon_vertices = polygon_vertices,
         .grounded = grounded,
         .collision_enabled = collision_enabled,
+        .ground_collision_enabled = ground_collision_enabled,
+        .ground_half_width = ground_half_width,
+        .ground_half_depth = ground_half_depth,
         .static_collider_alive = [_]bool{false} ** types.MAX_STATIC_COLLIDERS,
         .static_collider_x = [_]f32{0} ** types.MAX_STATIC_COLLIDERS,
         .static_collider_y = [_]f32{0} ** types.MAX_STATIC_COLLIDERS,
@@ -273,8 +305,13 @@ export fn engine_destroy(context: ?*EngineContext) void {
     allocator.free(value.ids);
     allocator.free(value.positions_x);
     allocator.free(value.positions_y);
+    allocator.free(value.positions_z);
     allocator.free(value.velocities_x);
     allocator.free(value.velocities_y);
+    allocator.free(value.velocities_z);
+    allocator.free(value.shadow_x);
+    allocator.free(value.shadow_y);
+    allocator.free(value.depth_order);
     allocator.free(value.sprite_ids);
     allocator.free(value.entities);
     allocator.free(value.grid_heads);
@@ -304,6 +341,9 @@ export fn engine_destroy(context: ?*EngineContext) void {
     allocator.free(value.polygon_vertices);
     allocator.free(value.grounded);
     allocator.free(value.collision_enabled);
+    allocator.free(value.ground_collision_enabled);
+    allocator.free(value.ground_half_width);
+    allocator.free(value.ground_half_depth);
     allocator.free(value.tilemap_tiles);
     allocator.destroy(value);
 }
@@ -322,10 +362,20 @@ fn resizeEntityStorage(context: *EngineContext, requested_capacity: usize) bool 
     @memset(context.positions_x[old_capacity..], 0);
     context.positions_y = allocator.realloc(context.positions_y, requested_capacity) catch return false;
     @memset(context.positions_y[old_capacity..], 0);
+    context.positions_z = allocator.realloc(context.positions_z, requested_capacity) catch return false;
+    @memset(context.positions_z[old_capacity..], 0);
     context.velocities_x = allocator.realloc(context.velocities_x, requested_capacity) catch return false;
     @memset(context.velocities_x[old_capacity..], 0);
     context.velocities_y = allocator.realloc(context.velocities_y, requested_capacity) catch return false;
     @memset(context.velocities_y[old_capacity..], 0);
+    context.velocities_z = allocator.realloc(context.velocities_z, requested_capacity) catch return false;
+    @memset(context.velocities_z[old_capacity..], 0);
+    context.shadow_x = allocator.realloc(context.shadow_x, requested_capacity) catch return false;
+    @memset(context.shadow_x[old_capacity..], 0);
+    context.shadow_y = allocator.realloc(context.shadow_y, requested_capacity) catch return false;
+    @memset(context.shadow_y[old_capacity..], 0);
+    context.depth_order = allocator.realloc(context.depth_order, requested_capacity) catch return false;
+    @memset(context.depth_order[old_capacity..], 0);
     context.sprite_ids = allocator.realloc(context.sprite_ids, requested_capacity) catch return false;
     @memset(context.sprite_ids[old_capacity..], 0);
     context.entities = allocator.realloc(context.entities, requested_capacity) catch return false;
@@ -374,6 +424,12 @@ fn resizeEntityStorage(context: *EngineContext, requested_capacity: usize) bool 
     @memset(context.grounded[old_capacity..], false);
     context.collision_enabled = allocator.realloc(context.collision_enabled, requested_capacity) catch return false;
     @memset(context.collision_enabled[old_capacity..], false);
+    context.ground_collision_enabled = allocator.realloc(context.ground_collision_enabled, requested_capacity) catch return false;
+    @memset(context.ground_collision_enabled[old_capacity..], false);
+    context.ground_half_width = allocator.realloc(context.ground_half_width, requested_capacity) catch return false;
+    @memset(context.ground_half_width[old_capacity..], 0);
+    context.ground_half_depth = allocator.realloc(context.ground_half_depth, requested_capacity) catch return false;
+    @memset(context.ground_half_depth[old_capacity..], 0);
     context.capacity = requested_capacity;
     context.telemetry.entity_capacity = @intCast(requested_capacity);
     return true;
@@ -403,11 +459,26 @@ export fn engine_positions_x(context: *EngineContext) [*]f32 {
 export fn engine_positions_y(context: *EngineContext) [*]f32 {
     return context.positions_y.ptr;
 }
+export fn engine_positions_z(context: *EngineContext) [*]f32 {
+    return context.positions_z.ptr;
+}
 export fn engine_velocities_x(context: *EngineContext) [*]f32 {
     return context.velocities_x.ptr;
 }
 export fn engine_velocities_y(context: *EngineContext) [*]f32 {
     return context.velocities_y.ptr;
+}
+export fn engine_velocities_z(context: *EngineContext) [*]f32 {
+    return context.velocities_z.ptr;
+}
+export fn engine_shadow_positions_x(context: *EngineContext) [*]f32 {
+    return context.shadow_x.ptr;
+}
+export fn engine_shadow_positions_y(context: *EngineContext) [*]f32 {
+    return context.shadow_y.ptr;
+}
+export fn engine_depth_order(context: *EngineContext) [*]const i32 {
+    return context.depth_order.ptr;
 }
 export fn engine_sprite_ids(context: *EngineContext) [*]u64 {
     return context.sprite_ids.ptr;
@@ -569,6 +640,31 @@ export fn engine_set_velocity(context: *EngineContext, index: u32, x: f32, y: f3
     return true;
 }
 
+export fn engine_set_25d_position(context: *EngineContext, index: u32, x: f32, z: f32, y: f32) bool {
+    if (index >= context.capacity or !types.isAlive(context, index)) return false;
+    context.positions_x[index] = x;
+    context.positions_z[index] = z;
+    context.positions_y[index] = y;
+    return true;
+}
+
+export fn engine_set_25d_velocity(context: *EngineContext, index: u32, x: f32, z: f32, y: f32) bool {
+    if (index >= context.capacity or !types.isAlive(context, index)) return false;
+    context.velocities_x[index] = x;
+    context.velocities_z[index] = z;
+    context.velocities_y[index] = y;
+    return true;
+}
+
+export fn engine_set_ground_aabb(context: *EngineContext, index: u32, body_type: u8, half_width: f32, half_depth: f32) bool {
+    if (index >= context.capacity or !types.isAlive(context, index) or half_width <= 0 or half_depth <= 0) return false;
+    context.body_type[index] = body_type;
+    context.ground_collision_enabled[index] = true;
+    context.ground_half_width[index] = half_width;
+    context.ground_half_depth[index] = half_depth;
+    return true;
+}
+
 export fn engine_spawn(context: *EngineContext, id: u64, x: f32, y: f32, velocity_x: f32, velocity_y: f32, sprite_id: u64) u32 {
     var index: ?usize = null;
     for (context.entities, 0..) |entity, candidate| {
@@ -588,8 +684,13 @@ export fn engine_spawn(context: *EngineContext, id: u64, x: f32, y: f32, velocit
     context.ids[slot] = id;
     context.positions_x[slot] = x;
     context.positions_y[slot] = y;
+    context.positions_z[slot] = 0;
     context.velocities_x[slot] = velocity_x;
     context.velocities_y[slot] = velocity_y;
+    context.velocities_z[slot] = 0;
+    context.shadow_x[slot] = x;
+    context.shadow_y[slot] = 0;
+    context.depth_order[slot] = 0;
     context.sprite_ids[slot] = sprite_id;
     context.animation_first_frame[slot] = sprite_id;
     context.animation_frame_ids[slot] = sprite_id;
@@ -609,6 +710,9 @@ export fn engine_spawn(context: *EngineContext, id: u64, x: f32, y: f32, velocit
     context.polygon_counts[slot] = 0;
     context.grounded[slot] = false;
     context.collision_enabled[slot] = false;
+    context.ground_collision_enabled[slot] = false;
+    context.ground_half_width[slot] = 0;
+    context.ground_half_depth[slot] = 0;
     context.anchor_counts[slot] = 0;
     context.alive_count += 1;
     return index_u32;
@@ -1078,6 +1182,25 @@ test "fast dynamic body stops at static platform" {
     engine_update(context, 0.02);
     try std.testing.expect(context.positions_y[body] <= 4.01);
     try std.testing.expect(engine_is_grounded(context, body));
+}
+
+test "2.5D bodies collide on xz and publish depth and shadow state" {
+    const context = engine_create(4, 8, 8, 16) orelse unreachable;
+    defer engine_destroy(context);
+    const first = engine_spawn(context, 1, 0, 0, 20, 0, 0);
+    const second = engine_spawn(context, 2, 3, 0, 0, 0, 0);
+    try std.testing.expect(engine_set_25d_position(context, first, 0, 4, 24));
+    try std.testing.expect(engine_set_25d_position(context, second, 3, 4, 0));
+    try std.testing.expect(engine_set_25d_velocity(context, first, 20, 0, 0));
+    try std.testing.expect(engine_set_ground_aabb(context, first, BODY_DYNAMIC, 2, 2));
+    try std.testing.expect(engine_set_ground_aabb(context, second, BODY_STATIC, 2, 2));
+    engine_update(context, 0.1);
+    try std.testing.expect(context.positions_x[first] < 1.01);
+    try std.testing.expect(context.positions_z[first] == 4);
+    try std.testing.expect(context.positions_y[first] > 24);
+    try std.testing.expect(context.shadow_x[first] == context.positions_x[first]);
+    try std.testing.expect(context.shadow_y[first] == context.positions_z[first]);
+    try std.testing.expect(context.depth_order[first] == 4000);
 }
 
 test "polygon shapes and polygon raycasts use exact boundaries" {

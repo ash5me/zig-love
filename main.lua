@@ -15,7 +15,7 @@ local EVENT_PLAY_SOUND, EVENT_PLAYER_DIED, EVENT_PATH_READY = 1, 2, 3
 local PATH_WORKING, PATH_FOUND = 1, 2
 local BODY_STATIC, BODY_KINEMATIC, BODY_DYNAMIC = 0, 1, 2
 local SHAPE_CIRCLE, SHAPE_CAPSULE = 1, 2
-local engine_context, positions_x, positions_y, velocities_x, velocities_y, sprite_ids, query_results, input_state, event
+local engine_context, positions_x, positions_y, positions_z, velocities_x, velocities_y, velocities_z, shadow_positions_x, shadow_positions_y, depth_order, sprite_ids, query_results, input_state, event
 local render_order, camera_matrix, camera_transform, camera_state
 local first_entity_id
 local first_physics_index, static_position_x, physics_checked = INVALID_INDEX, 0, false
@@ -53,8 +53,13 @@ function love.load()
     assert(engine_context ~= nil, "Zig could not allocate EngineContext")
     positions_x = zig.engine_positions_x(engine_context)
     positions_y = zig.engine_positions_y(engine_context)
+    positions_z = zig.engine_positions_z(engine_context)
     velocities_x = zig.engine_velocities_x(engine_context)
     velocities_y = zig.engine_velocities_y(engine_context)
+    velocities_z = zig.engine_velocities_z(engine_context)
+    shadow_positions_x = zig.engine_shadow_positions_x(engine_context)
+    shadow_positions_y = zig.engine_shadow_positions_y(engine_context)
+    depth_order = zig.engine_depth_order(engine_context)
     sprite_ids = zig.engine_sprite_ids(engine_context)
     render_order = zig.engine_render_order(engine_context)
     camera_matrix = zig.engine_camera_matrix(engine_context)
@@ -132,8 +137,13 @@ function love.load()
         event = event,
         positions_x = positions_x,
         positions_y = positions_y,
+        positions_z = positions_z,
         velocities_x = velocities_x,
         velocities_y = velocities_y,
+        velocities_z = velocities_z,
+        shadow_positions_x = shadow_positions_x,
+        shadow_positions_y = shadow_positions_y,
+        depth_order = depth_order,
         render_order = render_order,
         camera_matrix = camera_matrix,
         camera_transform = camera_transform,
