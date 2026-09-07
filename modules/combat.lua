@@ -4,13 +4,43 @@ Combat.__index = Combat
 
 -- Attack data is intentionally declarative: each move can contain multiple active windows.
 Combat.attacks = {
-    light = {
+    light_1 = {
         frame_duration = 1 / 12,
-        total_frames = 8,
+        total_frames = 10,
         hit_stop = 0.08,
         windows = {
             { start_frame = 3, end_frame = 4, hitboxes = {
                 { x = 34, y = 34, z = 0, width = 54, height = 34, depth = 28, damage = 1, knockback = { x = 95, y = 0, z = 18 } },
+            } },
+        },
+    },
+    light_2 = {
+        frame_duration = 1 / 12,
+        total_frames = 11,
+        hit_stop = 0.09,
+        windows = {
+            { start_frame = 3, end_frame = 5, hitboxes = {
+                { x = 40, y = 36, z = 0, width = 62, height = 38, depth = 30, damage = 1, knockback = { x = 120, y = 0, z = 22 } },
+            } },
+        },
+    },
+    light_3 = {
+        frame_duration = 1 / 12,
+        total_frames = 14,
+        hit_stop = 0.14,
+        windows = {
+            { start_frame = 4, end_frame = 6, hitboxes = {
+                { x = 48, y = 38, z = 0, width = 74, height = 42, depth = 34, damage = 2, knockback = { x = 180, y = 40, z = 30 } },
+            } },
+        },
+    },
+    jump_attack = {
+        frame_duration = 1 / 12,
+        total_frames = 12,
+        hit_stop = 0.12,
+        windows = {
+            { start_frame = 3, end_frame = 7, hitboxes = {
+                { x = 24, y = 48, z = 0, width = 62, height = 50, depth = 36, damage = 2, knockback = { x = 90, y = 90, z = 24 } },
             } },
         },
     },
@@ -27,6 +57,7 @@ function Combat.new(runtime)
     return setmetatable({
         runtime = runtime,
         attacks = {},
+        attack_data = Combat.attacks,
         hurtboxes = {},
         callbacks = {},
         frame = 0,
@@ -53,7 +84,7 @@ end
 function Combat:begin_attack(owner, attack)
     assert(type(owner) == "number", "combat owner must be an entity index")
     assert(type(attack) == "table" and attack.frame_duration and attack.total_frames, "invalid attack data")
-    self.attacks[owner] = { attack = attack, elapsed = 0, frame = 1 }
+    self.attacks[owner] = { attack = attack, elapsed = 0, frame = 1, hit_targets = {}, facing = 1 }
 end
 
 function Combat:register_hurtbox(owner, box)
@@ -85,6 +116,15 @@ function Combat:set_facing(owner, facing)
     if self.attacks[owner] then self.attacks[owner].facing = facing < 0 and -1 or 1 end
 end
 
+function Combat:is_attacking(owner)
+    return self.attacks[owner] ~= nil
+end
+
+function Combat:attack_frame(owner)
+    local state = self.attacks[owner]
+    return state and state.frame or 0
+end
+
 function Combat:resolve()
     local runtime = self.runtime
     runtime.zig.engine_combat_resolve(runtime.context)
@@ -95,8 +135,15 @@ function Combat:resolve()
             knockback = { x = tonumber(event.knockback_x), y = tonumber(event.knockback_y), z = tonumber(event.knockback_z) },
             hit_stop = tonumber(event.hit_stop),
         }
+        local attack_state = self.attacks[hit.attacker]
+        local hit_key = tostring(hit.victim)
+        if attack_state and attack_state.hit_targets[hit_key] then
+            goto continue
+        end
+        if attack_state then attack_state.hit_targets[hit_key] = true end
         runtime.hit_stop_remaining = math.max(runtime.hit_stop_remaining or 0, hit.hit_stop)
         for _, callback in ipairs(self.callbacks) do callback(hit) end
+        ::continue::
     end
 end
 

@@ -168,7 +168,11 @@ function love.load()
     runtime.input = Input.new()
     runtime.audio = Audio.new(runtime)
     local Combat = require("modules.combat")
+    local PlayerFSM = require("modules.player_fsm")
     runtime.combat = Combat.new(runtime)
+    runtime.new_player_fsm = function(owner, callbacks)
+        return PlayerFSM.new({ combat = runtime.combat, owner = owner, input = runtime.input, callbacks = callbacks })
+    end
     runtime.events:on(EVENT_PLAY_SOUND, function()
         runtime.status_text = "Play sound event"
     end)

@@ -69,6 +69,10 @@ Sum from Zig: 42
 - Physics state: static, kinematic, and dynamic bodies
 - Optional 2.5D ground-plane bodies with `x/z` AABB collision and independent vertical `y` gravity
 - Lua-visible ground-shadow coordinates and automatic `z` depth ordering
+- Frame-accurate 2.5D hitbox and hurtbox combat
+- Structured combat hit events with damage, knockback, and hit-stop durations
+- Lua player FSM with three-hit light combos, Jump Attack, Hitstun, and Knockdown
+- Recovery-window combo buffering with duplicate-hit prevention per attack
 - Dynamic-vs-dynamic collision response with impulses, restitution, and friction
 - Circle, capsule, AABB, OBB, and convex polygon collision primitives
 - Adaptive substep continuous collision detection for fast-moving bodies
@@ -103,8 +107,10 @@ modules/
   assets.lua            Cached asset/VFS facade
   events.lua             Bidirectional native event facade
   audio.lua              Spatial audio command consumer
+  combat.lua             Declarative hitbox/hurtbox combat registry
   input.lua              Rebindable action mapping
   json.lua              Dependency-free JSON decoder
+  player_fsm.lua         Player combat state machine and combo buffering
   ui.lua                 Debug panel / runtime controls
 game/
   levels.lua             Asset-backed platformer level data
@@ -165,10 +171,17 @@ The engine exports the following native API through LuaJIT FFI.
 - `engine_entity_anchor_count(...)`
 - `engine_set_position(...)`
 - `engine_set_velocity(...)`
+- `engine_set_25d_position(...)` with `x`, ground-plane `z`, and vertical `y`
+- `engine_set_25d_velocity(...)`
 - `engine_positions_x(...)`
 - `engine_positions_y(...)`
+- `engine_positions_z(...)`
 - `engine_velocities_x(...)`
 - `engine_velocities_y(...)`
+- `engine_velocities_z(...)`
+- `engine_shadow_positions_x(...)`
+- `engine_shadow_positions_y(...)`
+- `engine_depth_order(...)`
 - `engine_sprite_ids(...)`
 - `engine_set_gravity(...)`
 - `engine_get_gravity(...)`
@@ -184,6 +197,43 @@ The engine exports the following native API through LuaJIT FFI.
 - `engine_is_grounded(...)`
 - `engine_test_collision(...)`
 - `engine_raycast(...)`
+- `engine_set_ground_aabb(...)`
+
+### Combat
+
+Combat volumes are transient and should be registered every frame. Hitboxes and
+hurtboxes use offset AABBs with `x`, visual `y`, and ground-plane `z` coordinates.
+The native resolver emits structured events when volumes overlap.
+
+- `engine_combat_clear(...)`
+- `engine_combat_register_hitbox(...)`
+- `engine_combat_register_hurtbox(...)`
+- `engine_combat_resolve(...)`
+- `engine_next_combat_hit(...)`
+
+`modules/combat.lua` stores attack data as nested Lua tables. Each attack can
+define multiple active frame windows, offset boxes, damage, knockback, and
+hit-stop values. `modules/player_fsm.lua` consumes this registry and exposes the
+player controller through `runtime.new_player_fsm(owner, callbacks)`.
+
+Example:
+
+```lua
+local player = runtime.new_player_fsm(player_entity, {
+  on_state_changed = function(state)
+    print("Player state:", state)
+  end,
+  on_hit = function(hit)
+    print("Damage:", hit.damage, "Victim:", hit.victim)
+  end,
+})
+```
+
+The FSM buffers the light attack button only during each attack's recovery
+window. A valid input advances `Attack1` to `Attack2` and then `Attack3`; a
+missed window returns the player to `Idle`. Incoming hits transition to
+`Hitstun` or `Knockdown`, with temporary invulnerability during knockdown
+recovery. `Jump Attack` is available from `Idle` through the jump action.
 
 ### Spatial and rendering state
 
@@ -232,6 +282,7 @@ overflow is counted in telemetry instead of being silently discarded.
 `modules/input.lua` maps named actions to multiple keyboard keys, mouse buttons,
 gamepad buttons, and analog axes. The resulting action mask remains compatible
 with the native `InputState` ABI.
+
 - `engine_pending_event_count(...)`
 
 ### Frame memory
