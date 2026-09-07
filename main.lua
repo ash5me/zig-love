@@ -120,6 +120,7 @@ function love.load()
     local AssetManager = require("modules.assets")
     local Particles = require("modules.particles")
     local Lighting = require("modules.lighting")
+    local SpriteBatch = require("modules.sprite_batch")
     assets = AssetManager.new()
     runtime = {
         context = engine_context,
@@ -145,6 +146,7 @@ function love.load()
     }
     runtime.particles = Particles.new(runtime)
     runtime.lighting = Lighting.new(runtime)
+    runtime.sprite_batch = SpriteBatch.new(zig.engine_entity_capacity(engine_context))
     runtime.spawn_entities = function(count)
         for _ = 1, math.max(0, math.min(count, 100)) do
             local id = ffi.new("uint64_t", debug_sequence)
@@ -249,6 +251,9 @@ function love.textinput(text)
 end
 
 function love.quit()
+    if runtime ~= nil and runtime.sprite_batch ~= nil then
+        runtime.sprite_batch:release()
+    end
     if engine_context ~= nil then
         zig.engine_destroy(engine_context)
         engine_context = nil

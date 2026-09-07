@@ -8,7 +8,7 @@ No Continuous Collision Detection (CCD): Fast-moving dynamic entities will pass 
 Primitive Platformer Logic: In platformer.lua, platform landing is manually calculated in Lua with hardcoded array iterations instead of relying on the Zig physics solver.
 
 2. Rendering & Batching Pipeline
-No Sprite Batching or Instancing: Render loops in logic.lua call individual love.graphics.circle calls per entity. Drawing thousands of entities this way introduces massive CPU-to-GPU call overhead in Lua.
+Sprite Batching: Entity rendering now uses one reusable LÖVE SpriteBatch populated from Zig's native render-order array; the procedural dot texture can be replaced by an atlas-backed batch when sprite assets are mapped.
 
 Tilemap Engine: Orthogonal Tiled JSON loading, native tile storage, and LÖVE rendering are now provided by `modules/tilemap.lua`.
 

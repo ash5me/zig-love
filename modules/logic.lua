@@ -38,13 +38,8 @@ function logic.draw(state)
         if ok then
             love.graphics.push("all")
             love.graphics.applyTransform(state.camera_transform)
-            for order_index = 0, 9 do
-                local index = tonumber(state.render_order[order_index])
-                if index ~= nil then
-                    local x = tonumber(state.positions_x[index]) or 0
-                    local y = tonumber(state.positions_y[index]) or 0
-                    love.graphics.circle("fill", x, y, 4)
-                end
+            if state.sprite_batch then
+                state.sprite_batch:draw_entities(state)
             end
             love.graphics.pop()
         end

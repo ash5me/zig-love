@@ -64,6 +64,7 @@ Sum from Zig: 42
 - Native engine context created in Zig and exposed to Lua through FFI
 - ECS-managed entities with spawn, destroy, validity, and reuse logic
 - Position, velocity, render order, and sprite state management
+- Reusable LÖVE SpriteBatch path for ordered entity rendering
 - Physics state: static, kinematic, and dynamic bodies
 - Dynamic-vs-dynamic collision response with impulses, restitution, and friction
 - Circle, capsule, AABB, OBB, and convex polygon collision primitives
