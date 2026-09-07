@@ -186,6 +186,7 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
         .event_read = 0,
         .event_write = 0,
         .event_count = 0,
+        .dropped_events = 0,
         .path_visited = path_visited,
         .path_parent = path_parent,
         .path_queue = path_queue,
@@ -252,7 +253,7 @@ export fn engine_create(capacity: usize, grid_width: usize, grid_height: usize, 
         .light_intensity = [_]f32{1} ** types.MAX_LIGHTS,
         .light_count = 0,
         .gravity = 98.0,
-        .telemetry = .{ .physics_us = 0, .spatial_sort_us = 0, .ffi_serialization_us = 0, .frame_us = 0 },
+        .telemetry = .{ .physics_us = 0, .spatial_sort_us = 0, .ffi_serialization_us = 0, .frame_us = 0, .entity_capacity = @intCast(capacity), .dropped_events = 0 },
     };
     return context;
 }
@@ -302,10 +303,84 @@ export fn engine_destroy(context: ?*EngineContext) void {
 export fn engine_entity_capacity(context: *const EngineContext) usize {
     return context.capacity;
 }
+
+fn resizeEntityStorage(context: *EngineContext, requested_capacity: usize) bool {
+    if (requested_capacity <= context.capacity) return true;
+    const allocator = std.heap.page_allocator;
+    const old_capacity = context.capacity;
+    context.ids = allocator.realloc(context.ids, requested_capacity) catch return false;
+    @memset(context.ids[old_capacity..], 0);
+    context.positions_x = allocator.realloc(context.positions_x, requested_capacity) catch return false;
+    @memset(context.positions_x[old_capacity..], 0);
+    context.positions_y = allocator.realloc(context.positions_y, requested_capacity) catch return false;
+    @memset(context.positions_y[old_capacity..], 0);
+    context.velocities_x = allocator.realloc(context.velocities_x, requested_capacity) catch return false;
+    @memset(context.velocities_x[old_capacity..], 0);
+    context.velocities_y = allocator.realloc(context.velocities_y, requested_capacity) catch return false;
+    @memset(context.velocities_y[old_capacity..], 0);
+    context.sprite_ids = allocator.realloc(context.sprite_ids, requested_capacity) catch return false;
+    @memset(context.sprite_ids[old_capacity..], 0);
+    context.entities = allocator.realloc(context.entities, requested_capacity) catch return false;
+    @memset(context.entities[old_capacity..], null);
+    context.next_in_cell = allocator.realloc(context.next_in_cell, requested_capacity) catch return false;
+    @memset(context.next_in_cell[old_capacity..], INVALID_INDEX);
+    context.anchor_counts = allocator.realloc(context.anchor_counts, requested_capacity) catch return false;
+    @memset(context.anchor_counts[old_capacity..], 0);
+    context.render_order = allocator.realloc(context.render_order, requested_capacity) catch return false;
+    @memset(context.render_order[old_capacity..], INVALID_INDEX);
+    context.render_z = allocator.realloc(context.render_z, requested_capacity) catch return false;
+    @memset(context.render_z[old_capacity..], 0);
+    context.animation_first_frame = allocator.realloc(context.animation_first_frame, requested_capacity) catch return false;
+    @memset(context.animation_first_frame[old_capacity..], 0);
+    context.animation_frame_ids = allocator.realloc(context.animation_frame_ids, requested_capacity) catch return false;
+    @memset(context.animation_frame_ids[old_capacity..], 0);
+    context.animation_frame = allocator.realloc(context.animation_frame, requested_capacity) catch return false;
+    @memset(context.animation_frame[old_capacity..], 0);
+    context.animation_frame_count = allocator.realloc(context.animation_frame_count, requested_capacity) catch return false;
+    @memset(context.animation_frame_count[old_capacity..], 0);
+    context.animation_elapsed = allocator.realloc(context.animation_elapsed, requested_capacity) catch return false;
+    @memset(context.animation_elapsed[old_capacity..], 0);
+    context.animation_frame_duration = allocator.realloc(context.animation_frame_duration, requested_capacity) catch return false;
+    @memset(context.animation_frame_duration[old_capacity..], 0);
+    context.animation_loop = allocator.realloc(context.animation_loop, requested_capacity) catch return false;
+    @memset(context.animation_loop[old_capacity..], false);
+    context.body_type = allocator.realloc(context.body_type, requested_capacity) catch return false;
+    @memset(context.body_type[old_capacity..], BODY_DYNAMIC);
+    context.shape_type = allocator.realloc(context.shape_type, requested_capacity) catch return false;
+    @memset(context.shape_type[old_capacity..], SHAPE_CIRCLE);
+    context.shape_radius = allocator.realloc(context.shape_radius, requested_capacity) catch return false;
+    @memset(context.shape_radius[old_capacity..], 4);
+    context.capsule_half_length = allocator.realloc(context.capsule_half_length, requested_capacity) catch return false;
+    @memset(context.capsule_half_length[old_capacity..], 0);
+    context.shape_half_width = allocator.realloc(context.shape_half_width, requested_capacity) catch return false;
+    @memset(context.shape_half_width[old_capacity..], 4);
+    context.shape_half_height = allocator.realloc(context.shape_half_height, requested_capacity) catch return false;
+    @memset(context.shape_half_height[old_capacity..], 4);
+    context.shape_rotation = allocator.realloc(context.shape_rotation, requested_capacity) catch return false;
+    @memset(context.shape_rotation[old_capacity..], 0);
+    context.polygon_counts = allocator.realloc(context.polygon_counts, requested_capacity) catch return false;
+    @memset(context.polygon_counts[old_capacity..], 0);
+    context.polygon_vertices = allocator.realloc(context.polygon_vertices, requested_capacity * types.MAX_POLYGON_VERTICES * 2) catch return false;
+    @memset(context.polygon_vertices[old_capacity * types.MAX_POLYGON_VERTICES * 2 ..], 0);
+    context.grounded = allocator.realloc(context.grounded, requested_capacity) catch return false;
+    @memset(context.grounded[old_capacity..], false);
+    context.collision_enabled = allocator.realloc(context.collision_enabled, requested_capacity) catch return false;
+    @memset(context.collision_enabled[old_capacity..], false);
+    context.capacity = requested_capacity;
+    context.telemetry.entity_capacity = @intCast(requested_capacity);
+    return true;
+}
+
+export fn engine_reserve_entities(context: *EngineContext, additional_capacity: usize) bool {
+    if (additional_capacity == 0 or context.capacity > std.math.maxInt(usize) - additional_capacity) return false;
+    return resizeEntityStorage(context, context.capacity + additional_capacity);
+}
 export fn engine_alive_count(context: *const EngineContext) usize {
     return context.alive_count;
 }
 export fn engine_telemetry(context: *EngineContext) *Telemetry {
+    context.telemetry.entity_capacity = @intCast(context.capacity);
+    context.telemetry.dropped_events = context.dropped_events;
     return &context.telemetry;
 }
 export fn engine_set_gravity(context: *EngineContext, gravity: f32) void {
@@ -494,7 +569,11 @@ export fn engine_spawn(context: *EngineContext, id: u64, x: f32, y: f32, velocit
             break;
         }
     }
-    const slot = index orelse return INVALID_INDEX;
+    const slot = index orelse blk: {
+        const previous_capacity = context.capacity;
+        if (!resizeEntityStorage(context, @max(previous_capacity * 2, previous_capacity + 1))) return INVALID_INDEX;
+        break :blk previous_capacity;
+    };
     const entity = context.registry.create();
     context.entities[slot] = entity;
     const index_u32: u32 = @intCast(slot);
@@ -782,6 +861,19 @@ export fn engine_next_event(context: *EngineContext, output: *EngineEvent) bool 
     return true;
 }
 
+export fn engine_emit_event(context: *EngineContext, id: u32, value: u32) void {
+    runtime.pushEvent(context, id, value);
+}
+
+export fn engine_clear_events(context: *EngineContext) void {
+    context.event_read = context.event_write;
+    context.event_count = 0;
+}
+
+export fn engine_dropped_event_count(context: *const EngineContext) u64 {
+    return context.dropped_events;
+}
+
 export fn engine_pending_event_count(context: *const EngineContext) usize {
     return context.event_count;
 }
@@ -815,6 +907,18 @@ export fn engine_snapshot_write(context: *EngineContext, output: [*]u8, output_c
 
 export fn engine_snapshot_read(context: *EngineContext, input: [*]const u8, input_size: usize) bool {
     return snapshot.snapshotRead(context, input, input_size);
+}
+
+export fn engine_snapshot_delta_size(context: *const EngineContext) usize {
+    return snapshot.snapshotDeltaSize(context);
+}
+
+export fn engine_snapshot_write_delta(context: *EngineContext, base: [*]const u8, base_size: usize, output: [*]u8, output_capacity: usize) usize {
+    return snapshot.snapshotWriteDelta(context, base, base_size, output, output_capacity);
+}
+
+export fn engine_snapshot_apply_delta(context: *EngineContext, input: [*]const u8, input_size: usize) bool {
+    return snapshot.snapshotApplyDelta(context, input, input_size);
 }
 
 export fn engine_pathfind_begin(context: *EngineContext, start_x: i32, start_y: i32, goal_x: i32, goal_y: i32) bool {
@@ -957,4 +1061,45 @@ test "native render pools accept and expire transient data" {
     try std.testing.expect(light != INVALID_INDEX);
     try std.testing.expect(engine_light_destroy(context, light));
     try std.testing.expectEqual(@as(usize, 0), context.light_count);
+}
+
+test "entity pools grow and custom events round trip" {
+    const context = engine_create(1, 4, 4, 16) orelse unreachable;
+    defer engine_destroy(context);
+    const first = engine_spawn(context, 1, 0, 0, 0, 0, 0);
+    const second = engine_spawn(context, 2, 1, 0, 0, 0, 0);
+    try std.testing.expect(first != INVALID_INDEX and second != INVALID_INDEX);
+    try std.testing.expectEqual(@as(usize, 2), context.capacity);
+    engine_emit_event(context, 99, 42);
+    var event: EngineEvent = undefined;
+    try std.testing.expect(engine_next_event(context, &event));
+    try std.testing.expectEqual(@as(u32, 99), event.id);
+    try std.testing.expectEqual(@as(u32, 42), event.value);
+}
+
+test "snapshot restores membership, render pools, and applies deltas" {
+    const context = engine_create(4, 4, 4, 16) orelse unreachable;
+    defer engine_destroy(context);
+    const entity = engine_spawn(context, 1, 3, 4, 0, 0, 0);
+    try std.testing.expect(engine_tilemap_create(context, 2, 2, 16, 16));
+    try std.testing.expect(engine_tilemap_set_tile(context, 1, 1, 8));
+    try std.testing.expect(engine_particle_spawn(context, 1, 2, 0, 0, 2, 3, 1, 0, 0) != INVALID_INDEX);
+    const light = engine_light_create(context, 2, 3, 20, 1, 1, 1, 1);
+    try std.testing.expect(light != INVALID_INDEX);
+    const snapshot_size = engine_snapshot_size(context);
+    const snapshot_data = try std.testing.allocator.alloc(u8, snapshot_size);
+    defer std.testing.allocator.free(snapshot_data);
+    try std.testing.expectEqual(snapshot_size, engine_snapshot_write(context, snapshot_data.ptr, snapshot_data.len));
+    const delta_size = engine_snapshot_delta_size(context);
+    const delta_data = try std.testing.allocator.alloc(u8, delta_size);
+    defer std.testing.allocator.free(delta_data);
+    context.positions_x[entity] = 99;
+    const delta_written = engine_snapshot_write_delta(context, snapshot_data.ptr, snapshot_data.len, delta_data.ptr, delta_data.len);
+    try std.testing.expect(delta_written > 0);
+    try std.testing.expect(engine_snapshot_read(context, snapshot_data.ptr, snapshot_data.len));
+    try std.testing.expectEqual(@as(f32, 3), context.positions_x[entity]);
+    try std.testing.expect(types.isAlive(context, entity));
+    try std.testing.expectEqual(@as(u32, 8), context.tilemap_tiles[3]);
+    try std.testing.expect(engine_snapshot_apply_delta(context, delta_data.ptr, delta_written));
+    try std.testing.expectEqual(@as(f32, 99), context.positions_x[entity]);
 }

@@ -63,6 +63,7 @@ Sum from Zig: 42
 
 - Native engine context created in Zig and exposed to Lua through FFI
 - ECS-managed entities with spawn, destroy, validity, and reuse logic
+- Automatically growing entity storage with graceful spawn fallback and capacity telemetry
 - Position, velocity, render order, and sprite state management
 - Reusable LÖVE SpriteBatch path for ordered entity rendering
 - Physics state: static, kinematic, and dynamic bodies
@@ -72,7 +73,8 @@ Sum from Zig: 42
 - Native static AABB colliders and grounded contact reporting
 - Collision tests and raycast queries over a spatial grid
 - Pathfinding requests with incremental stepping
-- Snapshot serialization and restore support
+- Full snapshot serialization and ECS restore support, plus XOR delta snapshots for rollback
+- Bidirectional event commands with Lua handler registration and overflow accounting
 - Camera transform management
 - Animation state and frame selection in native code
 - Centralized asset manager with cached Lua, text, JSON, image, and sound loading
@@ -95,6 +97,7 @@ main.lua                 LÖVE entry point and FFI bridge setup
 game_logic.lua           Reloadable gameplay logic
 modules/
   assets.lua            Cached asset/VFS facade
+  events.lua             Bidirectional native event facade
   json.lua              Dependency-free JSON decoder
   ui.lua                 Debug panel / runtime controls
 game/
@@ -141,6 +144,7 @@ The engine exports the following native API through LuaJIT FFI.
 - `engine_create(...)`
 - `engine_destroy(...)`
 - `engine_entity_capacity(...)`
+- `engine_reserve_entities(...)`
 - `engine_alive_count(...)`
 - `engine_telemetry(...)`
 - `engine_update(...)`
@@ -207,6 +211,12 @@ allocating per-frame entity objects in Lua.
 
 - `engine_set_input(...)`
 - `engine_next_event(...)`
+- `engine_emit_event(...)`
+- `engine_clear_events(...)`
+- `engine_dropped_event_count(...)`
+
+`modules/events.lua` provides `on`, `emit`, `poll`, and `clear` methods. Event
+overflow is counted in telemetry instead of being silently discarded.
 - `engine_pending_event_count(...)`
 
 ### Frame memory
@@ -221,6 +231,13 @@ allocating per-frame entity objects in Lua.
 - `engine_snapshot_size(...)`
 - `engine_snapshot_write(...)`
 - `engine_snapshot_read(...)`
+- `engine_snapshot_delta_size(...)`
+- `engine_snapshot_write_delta(...)`
+- `engine_snapshot_apply_delta(...)`
+
+Snapshots include entity membership, simulation state, event state, tilemap
+data, particles, and lights. Delta snapshots encode XOR changes against a full
+base snapshot using zero-run compression.
 
 ### Pathfinding
 

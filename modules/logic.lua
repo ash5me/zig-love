@@ -6,13 +6,17 @@ function logic.update(state)
         state.path_status = state.zig.engine_pathfind_step(state.context, 32)
     end
 
-    while state.zig.engine_next_event(state.context, state.event) do
-        if state.event.id == state.event_play_sound then
-            state.status_text = "Play sound event"
-        elseif state.event.id == state.event_player_died then
-            state.status_text = "Player died event"
-        elseif state.event.id == state.event_path_ready then
-            state.status_text = "Path ready: " .. tostring(state.zig.engine_pathfind_length(state.context)) .. " nodes"
+    if state.events then
+        state.events:poll()
+    else
+        while state.zig.engine_next_event(state.context, state.event) do
+            if state.event.id == state.event_play_sound then
+                state.status_text = "Play sound event"
+            elseif state.event.id == state.event_player_died then
+                state.status_text = "Player died event"
+            elseif state.event.id == state.event_path_ready then
+                state.status_text = "Path ready: " .. tostring(state.zig.engine_pathfind_length(state.context)) .. " nodes"
+            end
         end
     end
 end

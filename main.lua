@@ -121,6 +121,7 @@ function love.load()
     local Particles = require("modules.particles")
     local Lighting = require("modules.lighting")
     local SpriteBatch = require("modules.sprite_batch")
+    local Events = require("modules.events")
     assets = AssetManager.new()
     runtime = {
         context = engine_context,
@@ -147,6 +148,16 @@ function love.load()
     runtime.particles = Particles.new(runtime)
     runtime.lighting = Lighting.new(runtime)
     runtime.sprite_batch = SpriteBatch.new(zig.engine_entity_capacity(engine_context))
+    runtime.events = Events.new(runtime)
+    runtime.events:on(EVENT_PLAY_SOUND, function()
+        runtime.status_text = "Play sound event"
+    end)
+    runtime.events:on(EVENT_PLAYER_DIED, function()
+        runtime.status_text = "Player died event"
+    end)
+    runtime.events:on(EVENT_PATH_READY, function()
+        runtime.status_text = "Path ready: " .. tostring(zig.engine_pathfind_length(engine_context)) .. " nodes"
+    end)
     runtime.spawn_entities = function(count)
         for _ = 1, math.max(0, math.min(count, 100)) do
             local id = ffi.new("uint64_t", debug_sequence)

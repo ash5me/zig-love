@@ -15,6 +15,8 @@ typedef struct {
     uint64_t spatial_sort_us;
     uint64_t ffi_serialization_us;
     uint64_t frame_us;
+    uint64_t entity_capacity;
+    uint64_t dropped_events;
 } Telemetry;
 typedef struct {
     uint32_t entity_index;
@@ -37,6 +39,7 @@ typedef struct {
 EngineContext* engine_create(size_t capacity, size_t grid_width, size_t grid_height, float cell_size);
 void engine_destroy(EngineContext* context);
 size_t engine_entity_capacity(const EngineContext* context);
+bool engine_reserve_entities(EngineContext* context, size_t additional_capacity);
 size_t engine_alive_count(const EngineContext* context);
 Telemetry* engine_telemetry(EngineContext* context);
 void engine_set_gravity(EngineContext* context, float gravity);
@@ -104,6 +107,9 @@ void engine_rebuild_spatial(EngineContext* context);
 size_t engine_query_cell(const EngineContext* context, int32_t cell_x, int32_t cell_y, uint32_t* output, size_t output_capacity);
 void engine_set_input(EngineContext* context, const InputState* input);
 bool engine_next_event(EngineContext* context, EngineEvent* output);
+void engine_emit_event(EngineContext* context, uint32_t id, uint32_t value);
+void engine_clear_events(EngineContext* context);
+uint64_t engine_dropped_event_count(const EngineContext* context);
 size_t engine_pending_event_count(const EngineContext* context);
 void engine_frame_begin(EngineContext* context);
 uint8_t* engine_frame_alloc(EngineContext* context, size_t size);
@@ -112,6 +118,9 @@ size_t engine_frame_arena_capacity(const EngineContext* context);
 size_t engine_snapshot_size(const EngineContext* context);
 size_t engine_snapshot_write(EngineContext* context, uint8_t* output, size_t output_capacity);
 bool engine_snapshot_read(EngineContext* context, const uint8_t* input, size_t input_size);
+size_t engine_snapshot_delta_size(const EngineContext* context);
+size_t engine_snapshot_write_delta(EngineContext* context, const uint8_t* base, size_t base_size, uint8_t* output, size_t output_capacity);
+bool engine_snapshot_apply_delta(EngineContext* context, const uint8_t* input, size_t input_size);
 bool engine_pathfind_begin(EngineContext* context, int32_t start_x, int32_t start_y, int32_t goal_x, int32_t goal_y);
 uint32_t engine_pathfind_step(EngineContext* context, size_t node_budget);
 uint32_t engine_pathfind_state(const EngineContext* context);

@@ -11,7 +11,7 @@ pub const MAX_TILEMAP_TILES: usize = 262144;
 pub const MAX_PARTICLES: usize = 4096;
 pub const MAX_LIGHTS: usize = 128;
 pub const SNAPSHOT_MAGIC: u32 = 0x5A47454E;
-pub const SNAPSHOT_VERSION: u32 = 2;
+pub const SNAPSHOT_VERSION: u32 = 3;
 
 pub const InputState = extern struct {
     buttons: u32,
@@ -29,6 +29,8 @@ pub const Telemetry = extern struct {
     spatial_sort_us: u64,
     ffi_serialization_us: u64,
     frame_us: u64,
+    entity_capacity: u64,
+    dropped_events: u64,
 };
 
 pub const RaycastHit = extern struct {
@@ -87,6 +89,13 @@ pub const SnapshotHeader = extern struct {
     path_state: u32,
     input: InputState,
     gravity: f32,
+    dropped_events: u64,
+    tilemap_width: u64,
+    tilemap_height: u64,
+    tilemap_tile_width: f32,
+    tilemap_tile_height: f32,
+    particle_count: u64,
+    light_count: u64,
 };
 
 pub const EngineContext = struct {
@@ -111,6 +120,7 @@ pub const EngineContext = struct {
     event_read: usize,
     event_write: usize,
     event_count: usize,
+    dropped_events: u64,
     path_visited: []bool,
     path_parent: []u32,
     path_queue: []u32,

@@ -107,7 +107,10 @@ fn solveCollisions(context: *EngineContext) void {
 }
 
 pub fn pushEvent(context: *EngineContext, id: u32, value: u32) void {
-    if (context.event_count == types.EVENT_QUEUE_CAPACITY) return;
+    if (context.event_count == types.EVENT_QUEUE_CAPACITY) {
+        context.dropped_events += 1;
+        return;
+    }
     context.events[context.event_write] = .{ .id = id, .value = value };
     context.event_write = (context.event_write + 1) % types.EVENT_QUEUE_CAPACITY;
     context.event_count += 1;

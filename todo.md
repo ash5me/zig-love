@@ -15,11 +15,11 @@ Tilemap Engine: Orthogonal Tiled JSON loading, native tile storage, and LÖVE re
 Particle and Lighting Systems: Native fixed-capacity particle and point-light pools now provide high-count FX, radial lighting, and rectangle shadow projection through `modules/particles.lua` and `modules/lighting.lua`.
 
 3. Engine Architecture & Memory Management
-Basic Fixed-Size Memory Limits: Context memory capacities are pre-allocated at startup without dynamic pool resizing, ring-buffer cleanup, or graceful fallback mechanisms when capacity fills up.
+Memory Management: Entity storage now grows automatically when the pool fills, `engine_reserve_entities` supports proactive growth, event overflow is counted, and `engine_clear_events` provides ring-buffer cleanup with graceful spawn failure if allocation cannot grow.
 
-Incomplete Snapshot Serialization: In engine_snapshot.zig, writing functions exist, but full state restoration (snapshotRead) and delta-compression for rollback networking are incomplete.
+Snapshot Serialization: Full restore now rebuilds ECS membership and includes simulation, event, tilemap, particle, and light state. XOR zero-run delta snapshots are available for rollback networking.
 
-Unidirectional Event Pipeline: Events flow from Zig to Lua via the ring buffer, but Lua lacks a structured, bi-directional event interface to pass custom triggers back into Zig cleanly.
+Event Pipeline: `modules/events.lua` provides structured `on`, `emit`, `poll`, and `clear` operations over the native ring buffer, making the event path bidirectional.
 
 4. Audio, Input & Asset Pipelines
 No Native Spatial Audio Engine: Audio events in Zig (EVENT_PLAY_SOUND) rely entirely on Lua catching the event ID and manually calling love.audio, with no spatial attenuation (distance-based volume/panning) calculated on the Zig side.
