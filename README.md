@@ -106,18 +106,20 @@ main.lua                 LÖVE entry point and FFI bridge setup
 game_logic.lua           Reloadable gameplay logic
 modules/
   assets.lua            Cached asset/VFS facade
-  camera_manager.lua    Forward-only camera and arena trigger manager
   events.lua             Bidirectional native event facade
   audio.lua              Spatial audio command consumer
-  combat.lua             Declarative hitbox/hurtbox combat registry
   input.lua              Rebindable action mapping
   json.lua              Dependency-free JSON decoder
-  grab_system.lua        Close-range player/enemy grab coordinator
-  enemy_ai.lua           Enemy approach, flank, attack, and projectile states
-  player_fsm.lua         Player combat state machine and combo buffering
   ui.lua                 Debug panel / runtime controls
 game/
   levels.lua             Asset-backed platformer level data
+  platformer.lua         Platformer gameplay logic
+  streets_of_rage/
+    combat.lua           Declarative hitbox/hurtbox combat registry
+    camera_manager.lua   Forward-only camera and arena trigger manager
+    enemy_ai.lua         Enemy approach, flank, attack, and projectile states
+    grab_system.lua      Close-range player/enemy grab coordinator
+    player_fsm.lua       Player combat state machine and combo buffering
 ffi_bindings.lua         LuaJIT FFI declarations
 tools/
   generate_bindings.ps1  Regenerate the FFI bindings
@@ -126,6 +128,10 @@ zig-out/bin/             Built native libraries and output artifacts
 ```
 
 ## ECS Architecture
+
+Gameplay architecture is separated by game mode. The existing platformer lives
+in `game/platformer.lua`, while the Streets of Rage-style systems live under
+`game/streets_of_rage/`. Shared engine adapters remain in `modules/`.
 
 Entity creation, validity, and destruction are owned by the pinned
 [`prime31/zig-ecs`](https://github.com/prime31/zig-ecs) registry. The existing

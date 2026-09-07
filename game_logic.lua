@@ -1,1 +1,1 @@
-return require("platformer")
+return require("streets_of_rage")
