@@ -10,8 +10,8 @@ local function level(state)
 end
 
 local function load_levels(state)
-    local loaded = state.assets:load_lua("game/levels.lua")
-    assert(type(loaded) == "table" and #loaded > 0, "game/levels.lua must return a non-empty level list")
+    local loaded = state.assets:load_lua("game/platformer/levels.lua")
+    assert(type(loaded) == "table" and #loaded > 0, "game/platformer/levels.lua must return a non-empty level list")
     state.platformer_levels = loaded
     state.level_index = math.min(state.level_index or 1, #loaded)
 end

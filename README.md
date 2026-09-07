@@ -112,8 +112,9 @@ modules/
   json.lua              Dependency-free JSON decoder
   ui.lua                 Debug panel / runtime controls
 game/
-  levels.lua             Asset-backed platformer level data
-  platformer.lua         Platformer gameplay logic
+  platformer/
+    levels.lua           Asset-backed platformer level data
+    platformer.lua       Platformer gameplay logic
   streets_of_rage/
     combat.lua           Declarative hitbox/hurtbox combat registry
     camera_manager.lua   Forward-only camera and arena trigger manager
@@ -130,7 +131,7 @@ zig-out/bin/             Built native libraries and output artifacts
 ## ECS Architecture
 
 Gameplay architecture is separated by game mode. The existing platformer lives
-in `game/platformer.lua`, while the Streets of Rage-style systems live under
+in `game/platformer/`, while the Streets of Rage-style systems live under
 `game/streets_of_rage/`. Shared engine adapters remain in `modules/`.
 
 Entity creation, validity, and destruction are owned by the pinned
@@ -153,7 +154,7 @@ paths and caches loaded values by asset type and path. It supports:
 - `load_sound(path, source_type)` for audio sources
 - `reload(path)`, `reload_all()`, and `clear()` for development and shutdown
 
-Platformer levels are loaded from `game/levels.lua` through this manager rather
+Platformer levels are loaded from `game/platformer/levels.lua` through this manager rather
 than being embedded in the gameplay module. Press `F5` to invalidate changed
 assets and reload gameplay and level data.
 
