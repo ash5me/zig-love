@@ -171,12 +171,20 @@ function love.load()
     local Combat = require("modules.combat")
     local PlayerFSM = require("modules.player_fsm")
     local EnemyAI = require("modules.enemy_ai")
+    local GrabSystem = require("modules.grab_system")
     local CameraManager = require("modules.camera_manager")
     runtime.combat = Combat.new(runtime)
+    runtime.grab_system = GrabSystem.new(runtime, runtime.combat)
     runtime.enemy_slots = EnemyAI.Slots(2)
     runtime.camera_manager = CameraManager.new(runtime)
-    runtime.new_player_fsm = function(owner, callbacks)
-        return PlayerFSM.new({ combat = runtime.combat, owner = owner, input = runtime.input, callbacks = callbacks })
+    runtime.new_player_fsm = function(owner, callbacks, options)
+        options = options or {}
+        options.combat = runtime.combat
+        options.owner = owner
+        options.input = runtime.input
+        options.callbacks = callbacks
+        options.grab_system = options.grab_system or runtime.grab_system
+        return PlayerFSM.new(options)
     end
     runtime.new_enemy_ai = function(owner, player, options)
         options = options or {}
@@ -185,7 +193,9 @@ function love.load()
         options.owner = owner
         options.player = player
         options.slots = options.slots or runtime.enemy_slots
-        return EnemyAI.new(options)
+        local enemy = EnemyAI.new(options)
+        runtime.grab_system:add_enemy(enemy)
+        return enemy
     end
     runtime.events:on(EVENT_PLAY_SOUND, function()
         runtime.status_text = "Play sound event"

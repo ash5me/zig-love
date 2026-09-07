@@ -44,6 +44,26 @@ Combat.attacks = {
             } },
         },
     },
+    knee_attack = {
+        frame_duration = 1 / 12,
+        total_frames = 8,
+        hit_stop = 0.1,
+        windows = {
+            { start_frame = 3, end_frame = 5, hitboxes = {
+                { x = 26, y = 34, z = 0, width = 50, height = 38, depth = 28, damage = 1, knockback = { x = 45, y = 12, z = 8 } },
+            } },
+        },
+    },
+    throw_projectile = {
+        frame_duration = 1 / 12,
+        total_frames = 18,
+        hit_stop = 0.12,
+        windows = {
+            { start_frame = 1, end_frame = 16, hitboxes = {
+                { x = 0, y = 36, z = 0, width = 48, height = 70, depth = 32, damage = 2, knockback = { x = 180, y = 30, z = 35 } },
+            } },
+        },
+    },
 }
 
 local function active_window(attack, frame)

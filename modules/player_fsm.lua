@@ -9,6 +9,8 @@ local STATE_ATTACK_3 = "Attack3"
 local STATE_HITSTUN = "Hitstun"
 local STATE_KNOCKDOWN = "Knockdown"
 local STATE_JUMP_ATTACK = "Jump Attack"
+local STATE_GRABBED = "Grabbed"
+local STATE_KNEE = "Knee Strike"
 
 local attack_states = {
     [STATE_ATTACK_1] = { attack = "light_1", next = STATE_ATTACK_2, total = 10, recovery_start = 7 },
@@ -34,6 +36,8 @@ function PlayerFSM.new(options)
         previous_jump = false,
         callbacks = options.callbacks or {},
         hurtbox = options.hurtbox or { x = 0, y = 36, z = 0, width = 30, height = 72, depth = 24 },
+        grab_system = options.grab_system,
+        grabbed_enemy = nil,
     }, PlayerFSM)
     self.combat:on_hit(function(hit) self:on_hit(hit) end)
     return self
@@ -48,6 +52,45 @@ function PlayerFSM:change_state(next_state)
     if next_state == STATE_IDLE then self.combat.attacks[self.owner] = nil end
     local callback = self.callbacks.on_state_changed
     if callback then callback(next_state) end
+end
+
+function PlayerFSM:begin_grab(enemy)
+    self.grabbed_enemy = enemy
+    enemy:set_grabbed(self)
+    self:change_state(STATE_GRABBED)
+    if self.callbacks.on_grab then self.callbacks.on_grab(enemy.owner) end
+end
+
+function PlayerFSM:direction()
+    local horizontal = 0
+    local depth = 0
+    if self.input and self.input:is_down("move_left") then horizontal = horizontal - 1 end
+    if self.input and self.input:is_down("move_right") then horizontal = horizontal + 1 end
+    if self.input and self.input:is_down("move_up") then depth = depth - 1 end
+    if self.input and self.input:is_down("move_down") then depth = depth + 1 end
+    if horizontal ~= 0 then self.facing = horizontal end
+    return horizontal, depth
+end
+
+function PlayerFSM:release_grab()
+    if self.grabbed_enemy then self.grabbed_enemy:release_grab() end
+    self.grabbed_enemy = nil
+end
+
+function PlayerFSM:start_knee()
+    self:change_state(STATE_KNEE)
+    self.combat:begin_attack(self.owner, self.combat.attack_data.knee_attack)
+    self.combat:set_facing(self.owner, self.facing)
+end
+
+function PlayerFSM:throw_grabbed(horizontal, depth)
+    local enemy = self.grabbed_enemy
+    if not enemy then return end
+    self:release_grab()
+    local direction_x = horizontal ~= 0 and horizontal or self.facing
+    local direction_z = depth ~= 0 and depth or 0
+    enemy:launch_projectile(direction_x * 300, direction_z * 160)
+    self:change_state(STATE_IDLE)
 end
 
 function PlayerFSM:pressed(action, previous)
@@ -72,10 +115,25 @@ function PlayerFSM:update(dt)
     self.previous_attack, self.previous_jump = attack_down, jump_down
 
     if self.state == STATE_IDLE then
+        if self.grab_system and self.grab_system:try_grab(self) then
+            self.previous_attack = attack_down
+            self.previous_jump = jump_down
+            self.combat:register_hurtbox(self.owner, self.hurtbox)
+            return
+        end
         if attack_pressed then
             self:start_attack(STATE_ATTACK_1)
         elseif jump_pressed then
             self:start_attack(STATE_JUMP_ATTACK)
+        end
+    elseif self.state == STATE_GRABBED then
+        if attack_pressed then
+            local horizontal, depth = self:direction()
+            if horizontal ~= 0 or depth ~= 0 then self:throw_grabbed(horizontal, depth) else self:start_knee() end
+        end
+    elseif self.state == STATE_KNEE then
+        if not self.combat:is_attacking(self.owner) then
+            self:change_state(STATE_GRABBED)
         end
     elseif attack_states[self.state] then
         local definition = attack_states[self.state]

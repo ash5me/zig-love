@@ -5,6 +5,8 @@ EnemyAI.__index = EnemyAI
 local STATE_APPROACH = "Approach"
 local STATE_FLANK = "Flank"
 local STATE_ATTACK = "Attack"
+local STATE_GRABBED = "Grabbed"
+local STATE_PROJECTILE = "Projectile"
 local Slots = {}
 Slots.__index = Slots
 
@@ -63,6 +65,9 @@ function EnemyAI.new(options)
         hurtbox = options.hurtbox or { x = 0, y = 36, z = 0, width = 30, height = 72, depth = 24 },
         attack_data = options.attack_data or options.combat.attack_data.light_1,
         callbacks = options.callbacks or {},
+        grabbed_by = nil,
+        projectile_vx = 0,
+        projectile_vz = 0,
     }, EnemyAI)
     return self
 end
@@ -73,6 +78,30 @@ function EnemyAI:change_state(next_state)
     self.state = next_state
     self.state_time = 0
     if self.callbacks.on_state_changed then self.callbacks.on_state_changed(next_state, self.owner) end
+end
+
+function EnemyAI:is_neutral()
+    return self.state == STATE_APPROACH or self.state == STATE_FLANK
+end
+
+function EnemyAI:set_grabbed(player)
+    self.slots:release(self.owner)
+    self.combat.attacks[self.owner] = nil
+    self.grabbed_by = player
+    self:change_state(STATE_GRABBED)
+end
+
+function EnemyAI:release_grab()
+    self.grabbed_by = nil
+    self:change_state(STATE_APPROACH)
+end
+
+function EnemyAI:launch_projectile(vx, vz)
+    self.grabbed_by = nil
+    self.projectile_vx, self.projectile_vz = vx, vz
+    self:change_state(STATE_PROJECTILE)
+    self.combat:begin_attack(self.owner, self.combat.attack_data.throw_projectile)
+    self.combat:set_facing(self.owner, vx < 0 and -1 or 1)
 end
 
 function EnemyAI:target_position()
@@ -117,6 +146,23 @@ function EnemyAI:update(dt)
         return
     end
     self.state_time = self.state_time + dt
+    if self.state == STATE_GRABBED then
+        local player = self.grabbed_by
+        if player then
+            local runtime = self.runtime
+            runtime.zig.engine_set_25d_position(runtime.context, self.owner, runtime.positions_x[player.owner] + player.facing * 28, runtime.positions_z[player.owner], runtime.positions_y[self.owner])
+        end
+        self:register_hurtbox()
+        return
+    end
+    if self.state == STATE_PROJECTILE then
+        local runtime = self.runtime
+        local x, z = self:position()
+        runtime.zig.engine_set_25d_position(runtime.context, self.owner, x + self.projectile_vx * dt, z + self.projectile_vz * dt, runtime.positions_y[self.owner])
+        if self.combat:is_attacking(self.owner) then self:register_attack() else self:change_state(STATE_APPROACH) end
+        self:register_hurtbox()
+        return
+    end
     local player_x, player_z = self:target_position()
     local enemy_x, enemy_z = self:position()
     local horizontal_distance = player_x - enemy_x

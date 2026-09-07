@@ -72,6 +72,7 @@ Sum from Zig: 42
 - Frame-accurate 2.5D hitbox and hurtbox combat
 - Structured combat hit events with damage, knockback, and hit-stop durations
 - Lua player FSM with three-hit light combos, Jump Attack, Hitstun, and Knockdown
+- Close-range grab locks with knee strikes and directional enemy throws
 - Recovery-window combo buffering with duplicate-hit prevention per attack
 - Dynamic-vs-dynamic collision response with impulses, restitution, and friction
 - Circle, capsule, AABB, OBB, and convex polygon collision primitives
@@ -111,6 +112,8 @@ modules/
   combat.lua             Declarative hitbox/hurtbox combat registry
   input.lua              Rebindable action mapping
   json.lua              Dependency-free JSON decoder
+  grab_system.lua        Close-range player/enemy grab coordinator
+  enemy_ai.lua           Enemy approach, flank, attack, and projectile states
   player_fsm.lua         Player combat state machine and combo buffering
   ui.lua                 Debug panel / runtime controls
 game/
